@@ -1,0 +1,13 @@
+transition,from_direction,to_direction,frames_to_stable,ms_to_stable,spurious_commands,spurious_count,threshold,smoothing,timestamp
+left->right,left,right,73,2396.2,none,0,0.9,3-of-5,2026-09-13 01:40:07
+right->up,right,up,38,1247.3,down,1,0.9,3-of-5,2026-09-13 01:40:10
+up->down,up,down,52,1697.6,none,0,0.9,3-of-5,2026-09-13 01:40:15
+down->left,down,left,104,3406.3,none,0,0.9,3-of-5,2026-09-13 01:40:19
+left->up,left,up,196,6423.8,none,0,0.9,3-of-5,2026-09-13 01:40:36
+right->down,right,down,73,2399.9,none,0,0.9,3-of-5,2026-09-13 01:40:45
+left->right,left,right,427,13994.6,up,1,0.9,3-of-5,2026-09-13 01:41:13
+right->up,right,up,358,11758.6,none,0,0.9,3-of-5,2026-09-13 01:41:59
+up->down,up,down,465,15264.7,none,0,0.9,3-of-5,2026-09-13 01:42:32
+down->left,down,left,105,3441.0,none,0,0.9,3-of-5,2026-09-13 01:42:46
+left->up,left,up,42,1374.8,none,0,0.9,3-of-5,2026-09-13 01:42:56
+right->down,right,down,34,1111.2,none,0,0.9,3-of-5,2026-09-13 01:43:02

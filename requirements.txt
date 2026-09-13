@@ -1,0 +1,39 @@
+# CNN-Based Gesture Controlled Gaming Application
+# Python 3.12 (tested on 3.12.10, 64-bit Windows)
+#
+# PyTorch is installed from the official PyTorch CUDA index, NOT from plain PyPI.
+# The plain-PyPI `torch` wheel on Windows is CPU-only, which this project does not accept.
+# The index directives below are part of the file, so the normal command still works:
+#
+#     pip install -r requirements.txt
+#
+# Equivalent manual command (CUDA 13.0 build, matches the RTX 3050 Ti driver):
+#
+#     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+#     pip install opencv-python pygame numpy matplotlib scikit-learn
+#
+# If you ever move this project to a machine with an older NVIDIA driver, swap cu130 for the
+# CUDA build that driver supports (for example cu126) — never drop the --index-url entirely.
+
+--index-url https://download.pytorch.org/whl/cu130
+--extra-index-url https://pypi.org/simple
+
+# Deep learning (CUDA-enabled build)
+torch==2.14.0+cu130
+torchvision==0.29.0+cu130
+
+# Dataset preparation (reads the HaGRID parquet shards)
+pyarrow==25.0.1
+
+# Computer vision, game, and supporting libraries
+opencv-python==5.0.0.93
+pygame==2.6.1
+numpy==2.5.3
+matplotlib==3.11.2
+scikit-learn==1.9.1
+
+# Key transitive versions confirmed working in this environment
+# (installed automatically by the packages above, listed here for reference only):
+#   scipy==1.18.1
+#   pillow==12.3.0
+#   sympy, networkx, jinja2, filelock, fsspec, joblib, threadpoolctl, narwhals

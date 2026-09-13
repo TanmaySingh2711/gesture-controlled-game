@@ -1,0 +1,239 @@
+{
+ "evaluated_split": "test",
+ "evaluated_at": "2026-09-13 01:20:19",
+ "phase": "P5",
+ "device": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+ "pytorch": "2.14.0+cu130",
+ "cuda": "13.0",
+ "inference": "torch.inference_mode, float32, no autocast, model.eval()",
+ "class_to_index": {
+  "left": 0,
+  "right": 1,
+  "up": 2,
+  "down": 3
+ },
+ "test_per_class": {
+  "left": 50,
+  "right": 50,
+  "up": 50,
+  "down": 50
+ },
+ "test_images": 200,
+ "test_loss": 0.029165,
+ "test_accuracy": 0.99,
+ "correct": 198,
+ "class_order": [
+  "left",
+  "right",
+  "up",
+  "down"
+ ],
+ "per_class": {
+  "left": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "support": 50
+  },
+  "right": {
+   "precision": 1.0,
+   "recall": 0.98,
+   "f1": 0.989899,
+   "support": 50
+  },
+  "up": {
+   "precision": 0.980392,
+   "recall": 1.0,
+   "f1": 0.990099,
+   "support": 50
+  },
+  "down": {
+   "precision": 0.98,
+   "recall": 0.98,
+   "f1": 0.98,
+   "support": 50
+  }
+ },
+ "macro_avg": {
+  "precision": 0.990098,
+  "recall": 0.99,
+  "f1": 0.989999
+ },
+ "weighted_avg": {
+  "precision": 0.990098,
+  "recall": 0.99,
+  "f1": 0.989999
+ },
+ "confusion_matrix": [
+  [
+   50,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   49,
+   0,
+   1
+  ],
+  [
+   0,
+   0,
+   50,
+   0
+  ],
+  [
+   0,
+   0,
+   1,
+   49
+  ]
+ ],
+ "confusion_matrix_order": [
+  "left",
+  "right",
+  "up",
+  "down"
+ ],
+ "targeted_confusions": {
+  "up_as_down": 0,
+  "down_as_up": 1,
+  "left_as_down": 0,
+  "down_as_left": 0
+ },
+ "misclassified": 2,
+ "misclassified_detail": [
+  {
+   "file": "dataset/right/right_00206.jpg",
+   "true_class": "right",
+   "predicted_class": "down",
+   "confidence": 0.602839
+  },
+  {
+   "file": "dataset/down/down_00058.jpg",
+   "true_class": "down",
+   "predicted_class": "up",
+   "confidence": 0.90307
+  }
+ ],
+ "confidence": {
+  "correct": {
+   "count": 198,
+   "mean": 0.9927590170291939,
+   "median": 0.9999633431434631,
+   "min": 0.6175262928009033,
+   "max": 1.0
+  },
+  "incorrect": {
+   "count": 2,
+   "mean": 0.7529547214508057,
+   "median": 0.7529547214508057,
+   "min": 0.602839469909668,
+   "max": 0.9030699729919434
+  },
+  "overall_mean": 0.9903609740734101,
+  "overall_median": 0.9999624490737915,
+  "incorrect_values": [
+   0.602839,
+   0.90307
+  ]
+ },
+ "lowest_confidence_correct": [
+  {
+   "file": "dataset/down/down_00309.jpg",
+   "true_class": "down",
+   "confidence": 0.617526,
+   "runner_up_class": "up",
+   "runner_up_probability": 0.36775
+  },
+  {
+   "file": "dataset/up/up_00139.jpg",
+   "true_class": "up",
+   "confidence": 0.768194,
+   "runner_up_class": "right",
+   "runner_up_probability": 0.179606
+  },
+  {
+   "file": "dataset/down/down_00116.jpg",
+   "true_class": "down",
+   "confidence": 0.800913,
+   "runner_up_class": "left",
+   "runner_up_probability": 0.175143
+  },
+  {
+   "file": "dataset/up/up_00465.jpg",
+   "true_class": "up",
+   "confidence": 0.928165,
+   "runner_up_class": "down",
+   "runner_up_probability": 0.071528
+  },
+  {
+   "file": "dataset/right/right_00412.jpg",
+   "true_class": "right",
+   "confidence": 0.930017,
+   "runner_up_class": "left",
+   "runner_up_probability": 0.069135
+  },
+  {
+   "file": "dataset/left/left_00464.jpg",
+   "true_class": "left",
+   "confidence": 0.940477,
+   "runner_up_class": "down",
+   "runner_up_probability": 0.031904
+  }
+ ],
+ "softmax_sums_to_one": true,
+ "softmax_sum_range": [
+  0.9999998807907104,
+  1.0000001192092896
+ ],
+ "outputs_finite": true,
+ "latency_batch1": {
+  "batch_size": 1,
+  "runs": 300,
+  "mean_ms": 6.038587525685628,
+  "median_ms": 6.096911907196045,
+  "p95_ms": 6.8809729576110845,
+  "min_ms": 4.639840126037598,
+  "max_ms": 8.979455947875977,
+  "predictions_per_second": 165.60164040786324
+ },
+ "throughput_batch32": {
+  "batch_size": 32,
+  "runs": 100,
+  "mean_ms": 18.231103534698487,
+  "median_ms": 18.19340705871582,
+  "p95_ms": 18.44679546356201,
+  "min_ms": 18.092960357666016,
+  "max_ms": 18.549503326416016,
+  "predictions_per_second": 1755.2420751215502
+ },
+ "validation_reference": {
+  "val_accuracy": 0.995,
+  "val_loss": 0.03620732486248016,
+  "note": "from P4; recorded here only as a generalization comparison"
+ },
+ "checkpoint": {
+  "path": "model/best_direction_model.pt",
+  "size_bytes": 9165963,
+  "architecture": "mobilenet_v2",
+  "input_size": [
+   3,
+   160,
+   160
+  ],
+  "class_to_index": {
+   "left": 0,
+   "right": 1,
+   "up": 2,
+   "down": 3
+  },
+  "task": "pacman_direction_v1",
+  "best_val_accuracy": 0.995,
+  "best_val_loss": 0.03620732486248016,
+  "epoch": 8,
+  "stage": "stage2_finetune"
+ },
+ "note": "Validation loss was the model-selection metric in P4; this test result is the final offline evaluation and was not used to tune anything. It measures held-out HaGRID hand crops, NOT live webcam reliability - P6 must establish that separately from webcam trials."
+}

@@ -1,0 +1,106 @@
+{
+ "evaluated_split": "test",
+ "test_images": 200,
+ "test_loss": 0.029334,
+ "test_accuracy": 0.99,
+ "correct": 198,
+ "class_order": [
+  "left",
+  "right",
+  "jump",
+  "neutral"
+ ],
+ "per_class": {
+  "left": {
+   "precision": 1.0,
+   "recall": 0.98,
+   "f1": 0.989899,
+   "support": 50
+  },
+  "right": {
+   "precision": 1.0,
+   "recall": 0.98,
+   "f1": 0.989899,
+   "support": 50
+  },
+  "jump": {
+   "precision": 0.980392,
+   "recall": 1.0,
+   "f1": 0.990099,
+   "support": 50
+  },
+  "neutral": {
+   "precision": 0.980392,
+   "recall": 1.0,
+   "f1": 0.990099,
+   "support": 50
+  }
+ },
+ "macro_avg": {
+  "precision": 0.990196,
+  "recall": 0.99,
+  "f1": 0.989999
+ },
+ "weighted_avg": {
+  "precision": 0.990196,
+  "recall": 0.99,
+  "f1": 0.989999
+ },
+ "confusion_matrix": [
+  [
+   49,
+   0,
+   0,
+   1
+  ],
+  [
+   0,
+   49,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   50,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   50
+  ]
+ ],
+ "misclassified": 2,
+ "confidence": {
+  "mean_confidence_correct": 0.9961952076415823,
+  "mean_confidence_incorrect": 0.889676421880722,
+  "min_confidence": 0.8000079393386841,
+  "max_confidence": 1.0,
+  "median_confidence": 0.9999805092811584
+ },
+ "cnn_only_gpu_latency_ms": 5.9455,
+ "cnn_only_predictions_per_second": 168.2,
+ "checkpoint": {
+  "path": "model/best_gesture_model.pt",
+  "size_bytes": 9164747,
+  "architecture": "mobilenet_v2",
+  "input_size": [
+   3,
+   160,
+   160
+  ],
+  "class_to_index": {
+   "left": 0,
+   "right": 1,
+   "jump": 2,
+   "neutral": 3
+  },
+  "best_val_accuracy": 0.99,
+  "best_val_loss": 0.04142391860485077,
+  "epoch": 7,
+  "stage": "stage2_finetune"
+ },
+ "note": "validation accuracy is the model-selection metric; test accuracy is the final offline evaluation metric. No test result was used for tuning."
+}

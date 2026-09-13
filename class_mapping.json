@@ -1,0 +1,27 @@
+{
+ "class_to_index": {
+  "down": 3,
+  "left": 0,
+  "right": 1,
+  "up": 2
+ },
+ "classes": [
+  "left",
+  "right",
+  "up",
+  "down"
+ ],
+ "gesture": {
+  "down": "dislike",
+  "left": "fist",
+  "right": "palm",
+  "up": "like"
+ },
+ "index_to_class": {
+  "0": "left",
+  "1": "right",
+  "2": "up",
+  "3": "down"
+ },
+ "note": "Frozen in P3 for the Pac-Man direction. Training and real-time inference must both use this mapping; never rely on alphabetical folder ordering. There is no neutral class: below-threshold predictions mean 'no new command', not a fifth class."
+}
