@@ -1,0 +1,69 @@
+name: CI
+
+# Everything that can run without a GPU or a webcam runs here on every push: formatting, lint,
+# static types, the pytest suite with coverage, and the legacy self-test scripts.
+#
+# The application itself requires CUDA, so CI installs the CPU build of PyTorch purely to test
+# the parts that import it (checkpoint loading, evaluation statistics). Tests marked `gpu` skip
+# automatically, and `webcam` tests only run when GESTURE_WEBCAM_TESTS=1 is set on a real machine.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (CPU PyTorch for CI)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install pygame==2.6.1 numpy==2.5.3 matplotlib==3.11.2 scikit-learn==1.9.1 \
+                      pyarrow==25.0.1 opencv-python-headless==5.0.0.93 pillow
+          pip install -r requirements-dev.txt
+          pip install -e . --no-deps
+
+      - name: Formatting
+        run: ruff format --check .
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Static types
+        run: mypy game src tests
+
+      # Includes the standalone self-test scripts (tests/test_self_tests.py), each in a fresh
+      # interpreter, with their coverage measured through coverage's subprocess patch.
+      - name: Tests with coverage
+        run: pytest --cov=game --cov=src --cov-report=term-missing --cov-report=xml
+
+      # Fails the build on any known vulnerability. The CPU torch wheels come from the PyTorch
+      # index, which pip-audit cannot query; it reports them as skipped rather than failing.
+      - name: Dependency audit
+        run: pip-audit --skip-editable
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml

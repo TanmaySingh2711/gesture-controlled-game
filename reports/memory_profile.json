@@ -1,0 +1,30 @@
+{
+  "game": {
+    "simulated_minutes": 10.0,
+    "frames": 36000,
+    "games_played": 11,
+    "wall_seconds": 100.7,
+    "rss_before_game_mb": 35.8,
+    "rss_game_created_mb": 46.6,
+    "rss_end_mb": 47.6,
+    "rss_growth_mb_per_minute_after_warmup": 0.004,
+    "python_heap_growth_after_warmup_mb": 0.039,
+    "python_heap_peak_mb": 0.05,
+    "cnn_stack_loaded": [],
+    "no_leak": true
+  },
+  "recognizer": {
+    "frames": 5000,
+    "device": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "wall_seconds": 66.0,
+    "rss_before_model_mb": 640.8,
+    "rss_model_loaded_mb": 758.8,
+    "rss_after_warmup_mb": 1034.2,
+    "rss_end_mb": 1026.1,
+    "rss_growth_mb_per_1k_frames": -0.562,
+    "cuda_allocated_mb": 16.8,
+    "cuda_peak_allocated_mb": 22.2,
+    "cuda_reserved_mb": 32.0,
+    "no_leak": true
+  }
+}

@@ -1,0 +1,33 @@
+{
+ "images_per_split": {
+  "train": 1600,
+  "val": 200,
+  "test": 200
+ },
+ "people_per_split": {
+  "train": 1226,
+  "val": 186,
+  "test": 190
+ },
+ "max_images_from_one_person": {
+  "train": 7,
+  "val": 3,
+  "test": 2
+ },
+ "shared_between_splits": {
+  "train/val": {
+   "shared_people": 68,
+   "val_images_from_shared_people": 81
+  },
+  "train/test": {
+   "shared_people": 77,
+   "test_images_from_shared_people": 82
+  },
+  "val/test": {
+   "shared_people": 17,
+   "test_images_from_shared_people": 19
+  }
+ },
+ "split_images_without_lineage": 0,
+ "lineage_matched": "2000/2000"
+}

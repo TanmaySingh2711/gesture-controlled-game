@@ -1,0 +1,236 @@
+{
+ "source": "dataset_external/ - unseen-subject HaGRID crops, frozen model, one pass",
+ "images": 2000,
+ "accuracy": 0.996,
+ "accuracy_wilson_95": [
+  0.9921265357039621,
+  0.9979717533930348
+ ],
+ "per_class": {
+  "left": {
+   "correct": 497,
+   "support": 500,
+   "recall": 0.994,
+   "wilson_95": [
+    0.9825097478959467,
+    0.9979574037280398
+   ]
+  },
+  "right": {
+   "correct": 496,
+   "support": 500,
+   "recall": 0.992,
+   "wilson_95": [
+    0.9796129641658948,
+    0.9968846848199377
+   ]
+  },
+  "up": {
+   "correct": 499,
+   "support": 500,
+   "recall": 0.998,
+   "wilson_95": [
+    0.9887592932948532,
+    0.9996468636054407
+   ]
+  },
+  "down": {
+   "correct": 500,
+   "support": 500,
+   "recall": 1.0,
+   "wilson_95": [
+    0.9923756595384479,
+    1.0
+   ]
+  }
+ },
+ "macro_f1": 0.9959999619815655,
+ "macro_f1_bootstrap_95": [
+  0.9930036152918178,
+  0.9985036329002708
+ ],
+ "bootstrap": {
+  "resamples": 10000,
+  "seed": 2026
+ },
+ "calibration": {
+  "ece": 0.0035190751701594386,
+  "mce": 0.4396414955457052,
+  "bins": [
+   {
+    "lower": 0.0,
+    "upper": 0.1,
+    "count": 0,
+    "accuracy": null,
+    "confidence": null,
+    "gap": null
+   },
+   {
+    "lower": 0.1,
+    "upper": 0.2,
+    "count": 0,
+    "accuracy": null,
+    "confidence": null,
+    "gap": null
+   },
+   {
+    "lower": 0.2,
+    "upper": 0.30000000000000004,
+    "count": 0,
+    "accuracy": null,
+    "confidence": null,
+    "gap": null
+   },
+   {
+    "lower": 0.30000000000000004,
+    "upper": 0.4,
+    "count": 1,
+    "accuracy": 0.0,
+    "confidence": 0.36598578095436096,
+    "gap": 0.36598578095436096
+   },
+   {
+    "lower": 0.4,
+    "upper": 0.5,
+    "count": 0,
+    "accuracy": null,
+    "confidence": null,
+    "gap": null
+   },
+   {
+    "lower": 0.5,
+    "upper": 0.6000000000000001,
+    "count": 3,
+    "accuracy": 1.0,
+    "confidence": 0.5603585044542948,
+    "gap": 0.4396414955457052
+   },
+   {
+    "lower": 0.6000000000000001,
+    "upper": 0.7000000000000001,
+    "count": 9,
+    "accuracy": 0.7777777777777778,
+    "confidence": 0.6631302634874979,
+    "gap": 0.11464751429027986
+   },
+   {
+    "lower": 0.7000000000000001,
+    "upper": 0.8,
+    "count": 5,
+    "accuracy": 0.8,
+    "confidence": 0.7586537599563599,
+    "gap": 0.04134624004364018
+   },
+   {
+    "lower": 0.8,
+    "upper": 0.9,
+    "count": 15,
+    "accuracy": 0.8,
+    "confidence": 0.8514839371045431,
+    "gap": 0.05148393710454302
+   },
+   {
+    "lower": 0.9,
+    "upper": 1.0,
+    "count": 1967,
+    "accuracy": 0.9994916115912558,
+    "confidence": 0.9977923628940882,
+    "gap": 0.0016992486971675325
+   }
+  ]
+ },
+ "brier_score": 0.00693968211048007,
+ "negative_log_likelihood": 0.014862371277423913,
+ "selective_prediction": [
+  {
+   "threshold": 0.0,
+   "accepted": 2000,
+   "coverage": 1.0,
+   "accuracy": 0.996,
+   "errors_accepted": 8
+  },
+  {
+   "threshold": 0.5,
+   "accepted": 1999,
+   "coverage": 0.9995,
+   "accuracy": 0.9964982491245623,
+   "errors_accepted": 7
+  },
+  {
+   "threshold": 0.6,
+   "accepted": 1996,
+   "coverage": 0.998,
+   "accuracy": 0.9964929859719439,
+   "errors_accepted": 7
+  },
+  {
+   "threshold": 0.7,
+   "accepted": 1987,
+   "coverage": 0.9935,
+   "accuracy": 0.9974836436839456,
+   "errors_accepted": 5
+  },
+  {
+   "threshold": 0.8,
+   "accepted": 1982,
+   "coverage": 0.991,
+   "accuracy": 0.9979818365287588,
+   "errors_accepted": 4
+  },
+  {
+   "threshold": 0.9,
+   "accepted": 1967,
+   "coverage": 0.9835,
+   "accuracy": 0.9994916115912558,
+   "errors_accepted": 1
+  },
+  {
+   "threshold": 0.95,
+   "accepted": 1946,
+   "coverage": 0.973,
+   "accuracy": 1.0,
+   "errors_accepted": 0
+  },
+  {
+   "threshold": 0.99,
+   "accepted": 1862,
+   "coverage": 0.931,
+   "accuracy": 1.0,
+   "errors_accepted": 0
+  }
+ ],
+ "at_live_threshold": {
+  "threshold": 0.9,
+  "accepted": 1967,
+  "coverage": 0.9835,
+  "accuracy": 0.9994916115912558,
+  "errors_accepted": 1
+ },
+ "provisional": false,
+ "provenance": {
+  "source": "HaGRID sample 500k (384p), train_val annotations",
+  "seed": 2026,
+  "per_class": 500,
+  "rule": "one image per person per class; nobody who appears anywhere in dataset/",
+  "excluded_people": 1452,
+  "lineage_complete": true
+ },
+ "distinct_people": 1727,
+ "duplicates_of_dataset_images": 0,
+ "loss": 0.014862369895912707,
+ "outputs_finite": true,
+ "softmax_sums_to_one": true,
+ "comparison_with_p5_test": {
+  "p5_test_accuracy": 0.99,
+  "p5_test_wilson_95": [
+   0.9642782382838231,
+   0.9972533418664555
+  ],
+  "difference_external_minus_p5": 0.006000000000000005,
+  "difference_newcombe_95": [
+   -0.002222815447543299,
+   0.03179722537845356
+  ],
+  "difference_is_significant": false
+ }
+}

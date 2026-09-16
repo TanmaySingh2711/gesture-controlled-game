@@ -41,3 +41,24 @@ Desktop.ini
 
 # Cached HaGRID parquet shards (re-downloadable, never committed)
 .hagrid_cache/
+
+# Retired endless-runner material: kept on disk for reference, not needed in the repository.
+# (Already-tracked copies stay tracked until removed from the index with
+#  `git rm -r --cached dataset_archive_endless_runner model/archive_endless_runner/*.pt`.)
+dataset_archive_endless_runner/**/*.jpg
+dataset_archive_endless_runner/**/*.jpeg
+dataset_archive_endless_runner/**/*.png
+model/archive_endless_runner/*.pt
+
+# Unseen-subject evaluation images, rebuilt by `python -m src.audit_hagrid_lineage --external`
+dataset_external/**/*.jpg
+
+# Weights trained by the architecture study (the frozen checkpoint is never among them)
+model/studies/
+
+# Tool caches and local test output
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/

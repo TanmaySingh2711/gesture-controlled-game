@@ -57,12 +57,17 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, NamedTuple
 
 import cv2
 import numpy as np
 
-ARCHIVE_URL = ("https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p/"
-               "resolve/main/hagrid-sample-500k-384p.zip")
+ARCHIVE_URL = (
+    "https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p/"
+    "resolve/main/hagrid-sample-500k-384p.zip"
+)
 ROOT = "hagrid-sample-500k-384p"
 
 GESTURE_FOR = {"left": "fist", "right": "palm", "up": "like", "down": "dislike"}
@@ -70,8 +75,8 @@ CLASSES = list(GESTURE_FOR)
 
 DEFAULT_PER_CLASS = 500
 SEED = 42
-PADDING = 0.25          # 25% of the box size added on every side
-MIN_CROP = 96           # px; smaller crops are too coarse to be useful, so they are replaced
+PADDING = 0.25  # 25% of the box size added on every side
+MIN_CROP = 96  # px; smaller crops are too coarse to be useful, so they are replaced
 MIN_BOX_FRACTION = 0.10  # skip boxes smaller than this fraction of the image's larger side
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -84,6 +89,8 @@ class RangeFile(io.RawIOBase):
     """Seekable read-only file over HTTP range requests, with retries."""
 
     def __init__(self, url, size):
+        if not url.startswith("https://"):
+            raise ValueError(f"refusing a non-https archive URL: {url!r}")
         self.url, self.size, self.pos = url, size, 0
         self.fetched, self.requests = 0, 0
 
@@ -160,7 +167,7 @@ def load_annotations(zf, gestures):
 def largest_box(record, wanted_label):
     """The biggest box carrying `wanted_label`, or None. Deterministic tie-break by index."""
     best, best_area = None, -1.0
-    for index, (box, label) in enumerate(zip(record["bboxes"], record["labels"])):
+    for box, label in zip(record["bboxes"], record["labels"], strict=True):
         if label != wanted_label:
             continue
         area = box[2] * box[3]
@@ -171,7 +178,7 @@ def largest_box(record, wanted_label):
 
 def build_candidates(annotations, selected):
     """project class -> deterministic list of (gesture_folder, uuid, box)."""
-    candidates = {label: [] for label in selected}
+    candidates: dict[str, list[tuple[str, str, list[float]]]] = {label: [] for label in selected}
     for project_class in selected:
         gesture = GESTURE_FOR[project_class]
         for uuid in sorted(annotations[gesture]):
@@ -191,7 +198,7 @@ def existing_hashes(selected):
 
     Classes being rebuilt are excluded, since their own folders are about to be replaced.
     """
-    digests = set()
+    digests: set[str] = set()
     if not os.path.isdir(DATASET_DIR):
         return digests
     for label in sorted(os.listdir(DATASET_DIR)):
@@ -202,12 +209,21 @@ def existing_hashes(selected):
             if name.startswith("."):
                 continue
             with open(os.path.join(folder, name), "rb") as handle:
-                digests.add(hashlib.md5(handle.read()).hexdigest())
+                digests.add(hashlib.md5(handle.read(), usedforsecurity=False).hexdigest())
     return digests
 
 
 def square_crop(image, box):
-    """Pad the box, square it off, clamp to the image. Returns the crop or None."""
+    """Pad the box, square it off, clamp to the image. Returns the crop or None.
+
+    Known quirk, kept deliberately: `left`/`top` and `side` are rounded separately, so when the
+    window is pushed against the far edge and both land on .5 (e.g. left 1.5 -> 2, side 133.5
+    -> 134 in a 135 px wide image) the slice overshoots by one pixel and numpy trims it,
+    giving a crop one pixel narrower than it is tall. None of the 2,000 dataset images is
+    affected - every one is exactly square, which tests/test_crop_hagrid_hands.py checks - but
+    the geometry stays as it was because the dataset, the frozen model and the lineage audit's
+    byte-for-byte replay all depend on this exact output.
+    """
     height, width = image.shape[:2]
     x, y, bw, bh = box
     x1, y1 = x * width, y * height
@@ -218,7 +234,7 @@ def square_crop(image, box):
 
     # Square by expanding the shorter side around the centre; never shrink the longer one.
     side = max(x2 - x1, y2 - y1)
-    side = min(side, width, height)           # cannot exceed the image
+    side = min(side, width, height)  # cannot exceed the image
     cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
     half = side / 2.0
     left, top = cx - half, cy - half
@@ -227,35 +243,201 @@ def square_crop(image, box):
     left = max(0.0, min(left, width - side))
     top = max(0.0, min(top, height - side))
 
-    left, top, side = int(round(left)), int(round(top)), int(round(side))
-    crop = image[top:top + side, left:left + side]
+    left, top, side = round(left), round(top), round(side)
+    crop = image[top : top + side, left : left + side]
     if crop.size == 0 or crop.shape[0] < 2 or crop.shape[1] < 2:
         return None
     return crop
 
 
-def main():
+SKIP_REASONS = ("missing", "unreadable", "too_small", "duplicate", "reused")
+
+
+class CropOutcome(NamedTuple):
+    """What happened to one candidate image."""
+
+    status: str  # "ok" or one of SKIP_REASONS
+    data: bytes | None = None
+    side: int = 0
+    digest: str = ""
+
+
+def crop_member(zf, members, gesture, uuid, box, seen_hashes):
+    """Fetch, decode, crop and encode one HaGRID image exactly as the dataset was built."""
+    member = f"{ROOT}/hagrid_500k/train_val_{gesture}/{uuid}.jpg"
+    if member not in members:
+        return CropOutcome("missing")
+    try:
+        image = cv2.imdecode(np.frombuffer(zf.read(member), np.uint8), cv2.IMREAD_COLOR)
+    except (KeyError, OSError, ValueError, RuntimeError, zipfile.BadZipFile, cv2.error):
+        image = None
+    if image is None:
+        return CropOutcome("unreadable")
+
+    crop = square_crop(image, box)
+    if crop is None or crop.shape[0] < MIN_CROP:
+        return CropOutcome("too_small")
+
+    ok, encoded = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    if not ok:
+        return CropOutcome("unreadable")
+    data = encoded.tobytes()
+    digest = hashlib.md5(data, usedforsecurity=False).hexdigest()
+    if digest in seen_hashes:
+        return CropOutcome("duplicate")
+    return CropOutcome("ok", data, crop.shape[0], digest)
+
+
+@dataclass
+class CropRun:
+    """Shared state for one cropping run across every class."""
+
+    zf: Any
+    members: set[str]
+    target: int
+    fetched_mb: Callable[[], float]
+    seen_hashes: set[str] = field(default_factory=set)
+    used_uuids: set[str] = field(default_factory=set)
+    counts: dict[str, int] = field(default_factory=dict)
+    skipped: dict[str, dict[str, int]] = field(default_factory=dict)
+    sizes: dict[str, list[int]] = field(default_factory=dict)
+
+
+def crop_class(run, label, order, output_dir=CROPPED_DIR):
+    """Walk one class's candidates in order until `run.target` crops are written."""
+    run.counts[label] = 0
+    run.skipped[label] = dict.fromkeys(SKIP_REASONS, 0)
+    run.sizes[label] = []
+    for gesture, uuid, box in order:
+        if run.counts[label] >= run.target:
+            break
+        if uuid in run.used_uuids:
+            run.skipped[label]["reused"] += 1
+            continue
+        outcome = crop_member(run.zf, run.members, gesture, uuid, box, run.seen_hashes)
+        if outcome.status != "ok":
+            run.skipped[label][outcome.status] += 1
+            continue
+
+        path = os.path.join(output_dir, label, f"{label}_{run.counts[label]:05d}.jpg")
+        with open(path, "wb") as target_file:
+            target_file.write(outcome.data)
+        run.seen_hashes.add(outcome.digest)
+        run.used_uuids.add(uuid)
+        run.sizes[label].append(outcome.side)
+        run.counts[label] += 1
+        if run.counts[label] % 100 == 0:
+            print(
+                f"  {label:<8} {run.counts[label]}/{run.target} ({run.fetched_mb():.0f} MB fetched)"
+            )
+
+    sizes = run.sizes[label]
+    print(
+        f"  {label:<8} done: {run.counts[label]}/{run.target}, "
+        f"crop side min {min(sizes) if sizes else 0} "
+        f"max {max(sizes) if sizes else 0} "
+        f"avg {sum(sizes) // len(sizes) if sizes else 0}, "
+        f"label='{GESTURE_FOR[label]}'"
+    )
+
+
+def seeded_order(candidates, selected, seed=SEED):
+    """Each class's candidates in the deterministic order they are walked in.
+
+    One random stream is shared across the classes in `selected`, so a class's order depends on
+    which classes are built alongside it - a fact the lineage audit relies on.
+    """
+    rng = random.Random(seed)
+    order = {}
+    for label in selected:
+        shuffled = list(candidates[label])
+        rng.shuffle(shuffled)
+        order[label] = shuffled
+    return order
+
+
+def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description="Crop HaGRID samples to annotated hand regions.")
     parser.add_argument("--per-class", type=int, default=DEFAULT_PER_CLASS)
-    parser.add_argument("--classes", nargs="+", choices=CLASSES, default=CLASSES,
-                        metavar="CLASS",
-                        help="build only these project classes (default: all four)")
-    parser.add_argument("--promote", action="store_true",
-                        help="replace dataset/ with the cropped dataset once it is built")
-    parser.add_argument("--keep-cache", action="store_true",
-                        help="keep the cached annotation JSONs")
-    args = parser.parse_args()
-    target = args.per_class
-    selected = [label for label in CLASSES if label in args.classes]
+    parser.add_argument(
+        "--classes",
+        nargs="+",
+        choices=CLASSES,
+        default=CLASSES,
+        metavar="CLASS",
+        help="build only these project classes (default: all four)",
+    )
+    parser.add_argument(
+        "--promote",
+        action="store_true",
+        help="replace dataset/ with the cropped dataset once it is built",
+    )
+    parser.add_argument(
+        "--keep-cache", action="store_true", help="keep the cached annotation JSONs"
+    )
+    return parser.parse_args(argv)
 
+
+def print_plan(selected, target):
     print("HaGRID hand-region cropping")
     print(f"source  : {ARCHIVE_URL.rsplit('/', 1)[-1]} (read over HTTP range requests)")
-    print(f"mapping : " + ", ".join(f"{GESTURE_FOR[c]} -> {c}" for c in selected))
+    print("mapping : " + ", ".join(f"{GESTURE_FOR[c]} -> {c}" for c in selected))
     print(f"padding : {PADDING:.0%} per side, squared, seed {SEED}, target {target}/class")
     if selected != CLASSES:
         untouched = ", ".join(c for c in CLASSES if c not in selected)
         print(f"building: {', '.join(selected)} only (not rebuilt: {untouched})")
     print("-" * 78)
+
+
+def clear_output(selected, output_dir=CROPPED_DIR):
+    for label in selected:
+        folder = os.path.join(output_dir, label)
+        os.makedirs(folder, exist_ok=True)
+        for name in os.listdir(folder):
+            if not name.startswith("."):
+                os.remove(os.path.join(folder, name))
+
+
+def print_summary(run, selected, handle):
+    print("-" * 78)
+    print(f"{'class':<10}{'source':<12}{'images':>8}   skipped")
+    for label in selected:
+        detail = ", ".join(f"{k}={v}" for k, v in run.skipped[label].items() if v)
+        print(f"{label:<10}{GESTURE_FOR[label]:<12}{run.counts[label]:>8}   {detail or '-'}")
+    print(f"{'TOTAL':<22}{sum(run.counts.values()):>8}")
+    print(f"transferred {handle.fetched / 1e6:.0f} MB in {handle.requests} range requests")
+
+
+def drop_annotation_cache(selected):
+    for gesture in (GESTURE_FOR[label] for label in selected):
+        cached = os.path.join(CACHE_DIR, f"ann_{gesture}.json")
+        if os.path.exists(cached):
+            os.remove(cached)
+    if os.path.isdir(CACHE_DIR) and not os.listdir(CACHE_DIR):
+        os.rmdir(CACHE_DIR)
+
+
+def promote(selected):
+    print("\npromoting dataset_cropped/ to dataset/ ...")
+    for label in selected:
+        destination = os.path.join(DATASET_DIR, label)
+        os.makedirs(destination, exist_ok=True)
+        for name in os.listdir(destination):
+            if not name.startswith("."):
+                os.remove(os.path.join(destination, name))
+        for name in os.listdir(os.path.join(CROPPED_DIR, label)):
+            shutil.move(os.path.join(CROPPED_DIR, label, name), os.path.join(destination, name))
+        os.rmdir(os.path.join(CROPPED_DIR, label))
+    if os.path.isdir(CROPPED_DIR) and not os.listdir(CROPPED_DIR):
+        os.rmdir(CROPPED_DIR)
+    print("dataset/ now holds the hand-region crops; dataset_cropped/ removed")
+
+
+def main(argv=None):
+    args = parse_arguments(argv)
+    target = args.per_class
+    selected = [label for label in CLASSES if label in args.classes]
+    print_plan(selected, target)
 
     handle, zf = open_archive()
     print(f"archive  : {handle.size / 1e9:.2f} GB, {len(zf.namelist())} members")
@@ -266,126 +448,37 @@ def main():
     print("\ncandidate boxes per class:")
     for label in selected:
         print(f"  {label:<8} ({GESTURE_FOR[label]:<10}) {len(candidates[label])}")
-    for label in selected:
-        if len(candidates[label]) < target:
-            print(f"ERROR: only {len(candidates[label])} candidates for {label}, need {target}")
-            return 1
+    short = [label for label in selected if len(candidates[label]) < target]
+    if short:
+        label = short[0]
+        print(f"ERROR: only {len(candidates[label])} candidates for {label}, need {target}")
+        return 1
 
-    # Deterministic order; classes are kept disjoint so one frame never feeds two classes.
-    rng = random.Random(SEED)
-    order = {}
-    for label in selected:
-        shuffled = list(candidates[label])
-        rng.shuffle(shuffled)
-        order[label] = shuffled
-
-    for label in selected:
-        os.makedirs(os.path.join(CROPPED_DIR, label), exist_ok=True)
-        for name in os.listdir(os.path.join(CROPPED_DIR, label)):
-            if not name.startswith("."):
-                os.remove(os.path.join(CROPPED_DIR, label, name))
-
-    members = set(zf.namelist())
-    used_uuids = set()
-    # Seeded with the classes we are keeping, so a new crop can never byte-match one of them.
-    seen_hashes = existing_hashes(selected)
-    if seen_hashes:
-        print(f"\nguarding against {len(seen_hashes)} images already in dataset/")
-    counts = {label: 0 for label in selected}
-    skipped = {label: {"missing": 0, "unreadable": 0, "too_small": 0,
-                       "duplicate": 0, "reused": 0} for label in selected}
-    sizes = {label: [] for label in selected}
+    order = seeded_order(candidates, selected)
+    clear_output(selected)
+    run = CropRun(
+        zf=zf,
+        members=set(zf.namelist()),
+        target=target,
+        fetched_mb=lambda: handle.fetched / 1e6,
+        # Seeded with the classes being kept, so a new crop can never byte-match one of them.
+        seen_hashes=existing_hashes(selected),
+    )
+    if run.seen_hashes:
+        print(f"\nguarding against {len(run.seen_hashes)} images already in dataset/")
 
     print("\ncropping:")
     for label in selected:
-        gesture_label = GESTURE_FOR[label]
-        for gesture, uuid, box in order[label]:
-            if counts[label] >= target:
-                break
-            if uuid in used_uuids:
-                skipped[label]["reused"] += 1
-                continue
-            member = f"{ROOT}/hagrid_500k/train_val_{gesture}/{uuid}.jpg"
-            if member not in members:
-                skipped[label]["missing"] += 1
-                continue
-            try:
-                payload = zf.read(member)
-                image = cv2.imdecode(np.frombuffer(payload, np.uint8), cv2.IMREAD_COLOR)
-            except Exception:
-                image = None
-            if image is None:
-                skipped[label]["unreadable"] += 1
-                continue
-
-            crop = square_crop(image, box)
-            if crop is None or crop.shape[0] < MIN_CROP:
-                skipped[label]["too_small"] += 1
-                continue
-
-            ok, encoded = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-            if not ok:
-                skipped[label]["unreadable"] += 1
-                continue
-            digest = hashlib.md5(encoded.tobytes()).hexdigest()
-            if digest in seen_hashes:
-                skipped[label]["duplicate"] += 1
-                continue
-
-            path = os.path.join(CROPPED_DIR, label, f"{label}_{counts[label]:05d}.jpg")
-            with open(path, "wb") as target_file:
-                target_file.write(encoded.tobytes())
-
-            seen_hashes.add(digest)
-            used_uuids.add(uuid)
-            sizes[label].append(crop.shape[0])
-            counts[label] += 1
-            if counts[label] % 100 == 0:
-                print(f"  {label:<8} {counts[label]}/{target} "
-                      f"({handle.fetched / 1e6:.0f} MB fetched)")
-        print(f"  {label:<8} done: {counts[label]}/{target}, "
-              f"crop side min {min(sizes[label]) if sizes[label] else 0} "
-              f"max {max(sizes[label]) if sizes[label] else 0} "
-              f"avg {sum(sizes[label]) // len(sizes[label]) if sizes[label] else 0}, "
-              f"label='{gesture_label}'")
-
-    print("-" * 78)
-    print(f"{'class':<10}{'source':<12}{'images':>8}   skipped")
-    for label in selected:
-        detail = ", ".join(f"{k}={v}" for k, v in skipped[label].items() if v)
-        print(f"{label:<10}{GESTURE_FOR[label]:<12}{counts[label]:>8}   {detail or '-'}")
-    print(f"{'TOTAL':<22}{sum(counts.values()):>8}")
-    print(f"transferred {handle.fetched / 1e6:.0f} MB in {handle.requests} range requests")
+        crop_class(run, label, order[label])
+    print_summary(run, selected, handle)
 
     if not args.keep_cache:
-        for gesture in (GESTURE_FOR[label] for label in selected):
-            cached = os.path.join(CACHE_DIR, f"ann_{gesture}.json")
-            if os.path.exists(cached):
-                os.remove(cached)
-        if os.path.isdir(CACHE_DIR) and not os.listdir(CACHE_DIR):
-            os.rmdir(CACHE_DIR)
-
-    complete = all(counts[label] == target for label in selected)
-    if not complete:
+        drop_annotation_cache(selected)
+    if not all(run.counts[label] == target for label in selected):
         print("RESULT: INCOMPLETE - some classes did not reach the target")
         return 1
-
     if args.promote:
-        print("\npromoting dataset_cropped/ to dataset/ ...")
-        for label in selected:
-            destination = os.path.join(DATASET_DIR, label)
-            os.makedirs(destination, exist_ok=True)
-            for name in os.listdir(destination):
-                if not name.startswith("."):
-                    os.remove(os.path.join(destination, name))
-            for name in os.listdir(os.path.join(CROPPED_DIR, label)):
-                shutil.move(os.path.join(CROPPED_DIR, label, name),
-                            os.path.join(destination, name))
-            os.rmdir(os.path.join(CROPPED_DIR, label))
-        if os.path.isdir(CROPPED_DIR) and not os.listdir(CROPPED_DIR):
-            os.rmdir(CROPPED_DIR)
-        print("dataset/ now holds the hand-region crops; dataset_cropped/ removed")
-
+        promote(selected)
     print("RESULT: PASS - all classes complete and balanced")
     return 0
 

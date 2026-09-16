@@ -20,7 +20,7 @@ Mirror convention (frozen in PROJECT_SPEC.md section 7):
     never sees a differently-framed image at inference time.
 
 Controls:
-    1 / 2 / 3 / 4   select class LEFT / RIGHT / JUMP / NEUTRAL
+    1 / 2 / 3 / 4   select class LEFT / RIGHT / UP / DOWN
     SPACE           start or pause automatic capture
     C               capture a single image
     Q or ESC        quit
@@ -30,9 +30,14 @@ Usage:
     python src/collect_dataset.py --selftest    # verify webcam, flip and ROI without saving
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 import cv2
 
@@ -48,7 +53,7 @@ ROI_X2, ROI_Y2 = 600, 390
 ROI_SIZE = (ROI_X2 - ROI_X1, ROI_Y2 - ROI_Y1)  # (300, 300)
 
 TARGET_PER_CLASS = 400
-CAPTURES_PER_SECOND = 4          # 4 fps -> ~0.25 s between saved images
+CAPTURES_PER_SECOND = 4  # 4 fps -> ~0.25 s between saved images
 CAPTURE_INTERVAL = 1.0 / CAPTURES_PER_SECOND
 
 CLASSES = ["left", "right", "up", "down"]
@@ -106,8 +111,9 @@ def draw_overlay(display, label, counts, capturing):
     """Draw the ROI box, the current state and the on-screen instructions."""
     in_roi_color = (0, 220, 0) if capturing else (0, 200, 255)
     cv2.rectangle(display, (ROI_X1, ROI_Y1), (ROI_X2, ROI_Y2), in_roi_color, 2)
-    cv2.putText(display, "ROI", (ROI_X1 + 6, ROI_Y1 + 22),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, in_roi_color, 2)
+    cv2.putText(
+        display, "ROI", (ROI_X1 + 6, ROI_Y1 + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, in_roi_color, 2
+    )
 
     # Dark band behind the text so it stays readable on any background.
     cv2.rectangle(display, (0, 0), (FRAME_WIDTH, 74), (0, 0, 0), -1)
@@ -119,17 +125,39 @@ def draw_overlay(display, label, counts, capturing):
     if done >= TARGET_PER_CLASS:
         state, state_color = "TARGET REACHED", (0, 220, 220)
 
-    cv2.putText(display, f"CLASS: {label.upper()}   {done}/{TARGET_PER_CLASS}", (10, 26),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    cv2.putText(
+        display,
+        f"CLASS: {label.upper()}   {done}/{TARGET_PER_CLASS}",
+        (10, 26),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2,
+    )
     cv2.putText(display, state, (430, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
-    cv2.putText(display, GESTURE_HINTS[label], (10, 52),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+    cv2.putText(
+        display, GESTURE_HINTS[label], (10, 52), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1
+    )
 
     totals = "  ".join(f"{c[:1].upper()}:{counts[c]}" for c in CLASSES)
-    cv2.putText(display, f"totals  {totals}   (target {TARGET_PER_CLASS} each)",
-                (10, FRAME_HEIGHT - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
-    cv2.putText(display, "1 left  2 right  3 up  4 down  |  SPACE capture  C single  Q quit",
-                (10, FRAME_HEIGHT - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+    cv2.putText(
+        display,
+        f"totals  {totals}   (target {TARGET_PER_CLASS} each)",
+        (10, FRAME_HEIGHT - 32),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (180, 180, 180),
+        1,
+    )
+    cv2.putText(
+        display,
+        "1 left  2 right  3 up  4 down  |  SPACE capture  C single  Q quit",
+        (10, FRAME_HEIGHT - 10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (255, 255, 255),
+        1,
+    )
 
 
 def open_camera():
@@ -141,7 +169,7 @@ def open_camera():
     return capture
 
 
-def selftest():
+def selftest() -> int:
     """Non-interactive check: capture one frame, flip it, crop the ROI, save nothing."""
     print("Self-test: webcam -> horizontal flip -> ROI crop (no images are saved)")
     capture = open_camera()
@@ -157,37 +185,110 @@ def selftest():
 
         roi = flipped[ROI_Y1:ROI_Y2, ROI_X1:ROI_X2]
         if (roi.shape[1], roi.shape[0]) != ROI_SIZE:
-            print(f"[FAIL] ROI crop is {roi.shape[1]}x{roi.shape[0]}, expected {ROI_SIZE[0]}x{ROI_SIZE[1]}")
+            print(
+                f"[FAIL] ROI crop is {roi.shape[1]}x{roi.shape[0]}, expected {ROI_SIZE[0]}x{ROI_SIZE[1]}"
+            )
             return 1
-        print(f"[PASS] ROI crop                {roi.shape[1]}x{roi.shape[0]} "
-              f"at x[{ROI_X1}:{ROI_X2}] y[{ROI_Y1}:{ROI_Y2}]")
+        print(
+            f"[PASS] ROI crop                {roi.shape[1]}x{roi.shape[0]} "
+            f"at x[{ROI_X1}:{ROI_X2}] y[{ROI_Y1}:{ROI_Y2}]"
+        )
 
         for label in CLASSES:
             folder = class_dir(label)
             status = "ok" if os.path.isdir(folder) else "MISSING"
-            print(f"[{'PASS' if status == 'ok' else 'FAIL'}] dataset/{label:<8} {status}, "
-                  f"{count_existing(label)} images present")
+            print(
+                f"[{'PASS' if status == 'ok' else 'FAIL'}] dataset/{label:<8} {status}, "
+                f"{count_existing(label)} images present"
+            )
         return 0
     finally:
         capture.release()
         print("[PASS] webcam released cleanly")
 
 
-def main():
+@dataclass
+class CaptureSession:
+    """Everything the capture loop remembers between frames."""
+
+    counts: dict[str, int]
+    next_index: dict[str, int]
+    label: str = "left"
+    capturing: bool = False
+    last_capture: float = 0.0
+
+    @classmethod
+    def from_disk(cls) -> CaptureSession:
+        counts = {label: count_existing(label) for label in CLASSES}
+        return cls(counts=counts, next_index=dict(counts))
+
+    def record_save(self, new_index: int | None) -> bool:
+        """Account for one save attempt. False if the image was not written."""
+        if new_index is None:
+            return False
+        self.next_index[self.label] = new_index
+        self.counts[self.label] += 1
+        return True
+
+
+SaveFunction = Callable[[str, Any, int], "int | None"]
+
+
+def auto_capture(
+    session: CaptureSession, roi: Any, now: float, save: SaveFunction = save_roi
+) -> None:
+    """Save one image if capture is on, the class is not full, and the interval has passed."""
+    label = session.label
+    if (
+        not session.capturing
+        or session.counts[label] >= TARGET_PER_CLASS
+        or now - session.last_capture < CAPTURE_INTERVAL
+    ):
+        return
+    if session.record_save(save(label, roi, session.next_index[label])):
+        session.last_capture = now
+        if session.counts[label] >= TARGET_PER_CLASS:
+            session.capturing = False
+            print(f"[info] target reached for {label} ({session.counts[label]} images)")
+
+
+def handle_key(session: CaptureSession, key: int, roi: Any, save: SaveFunction = save_roi) -> bool:
+    """Apply one key press. Returns False when the user asked to quit."""
+    if key in (ord("q"), 27):
+        return False
+    if key in CLASS_KEYS:
+        session.label = CLASS_KEYS[key]
+        session.capturing = False
+        print(
+            f"[info] class -> {session.label} ({session.counts[session.label]}/{TARGET_PER_CLASS})"
+        )
+    elif key == ord(" "):
+        label = session.label
+        if session.counts[label] >= TARGET_PER_CLASS:
+            print(f"[info] {label} already has {session.counts[label]} images")
+        else:
+            session.capturing = not session.capturing
+            session.last_capture = 0.0
+            print(f"[info] capture {'started' if session.capturing else 'paused'} for {label}")
+    elif key == ord("c") and session.record_save(
+        save(session.label, roi, session.next_index[session.label])
+    ):
+        print(
+            f"[info] saved 1 image  {session.label} {session.counts[session.label]}/{TARGET_PER_CLASS}"
+        )
+    return True
+
+
+def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
 
     for label in CLASSES:
         os.makedirs(class_dir(label), exist_ok=True)
-
-    counts = {label: count_existing(label) for label in CLASSES}
-    next_index = {label: counts[label] for label in CLASSES}
-    label = "left"
-    capturing = False
-    last_capture = 0.0
+    session = CaptureSession.from_disk()
 
     print(__doc__.split("Controls:")[1].split("Usage:")[0])
-    print("Existing images:", ", ".join(f"{c}={counts[c]}" for c in CLASSES))
+    print("Existing images:", ", ".join(f"{c}={session.counts[c]}" for c in CLASSES))
 
     capture = open_camera()
     window = "Gesture dataset collection"
@@ -201,51 +302,22 @@ def main():
             # Mirror convention: flip first, then everything downstream sees the mirror view.
             frame = cv2.flip(frame, 1)
             roi = frame[ROI_Y1:ROI_Y2, ROI_X1:ROI_X2].copy()
-
-            now = time.time()
-            if capturing and counts[label] < TARGET_PER_CLASS and now - last_capture >= CAPTURE_INTERVAL:
-                new_index = save_roi(label, roi, next_index[label])
-                if new_index is not None:
-                    next_index[label] = new_index
-                    counts[label] += 1
-                    last_capture = now
-                    if counts[label] >= TARGET_PER_CLASS:
-                        capturing = False
-                        print(f"[info] target reached for {label} ({counts[label]} images)")
+            auto_capture(session, roi, time.time())
 
             display = frame.copy()  # overlay is drawn on a copy so it never lands in saved data
-            draw_overlay(display, label, counts, capturing)
+            draw_overlay(display, session.label, session.counts, session.capturing)
             cv2.imshow(window, display)
 
-            key = cv2.waitKey(1) & 0xFF
-            if key in (ord("q"), 27):
+            if not handle_key(session, cv2.waitKey(1) & 0xFF, roi):
                 break
-            if key in CLASS_KEYS:
-                label = CLASS_KEYS[key]
-                capturing = False
-                print(f"[info] class -> {label} ({counts[label]}/{TARGET_PER_CLASS})")
-            elif key == ord(" "):
-                if counts[label] >= TARGET_PER_CLASS:
-                    print(f"[info] {label} already has {counts[label]} images")
-                else:
-                    capturing = not capturing
-                    last_capture = 0.0
-                    print(f"[info] capture {'started' if capturing else 'paused'} for {label}")
-            elif key == ord("c"):
-                new_index = save_roi(label, roi, next_index[label])
-                if new_index is not None:
-                    next_index[label] = new_index
-                    counts[label] += 1
-                    print(f"[info] saved 1 image  {label} {counts[label]}/{TARGET_PER_CLASS}")
-
             if cv2.getWindowProperty(window, cv2.WND_PROP_VISIBLE) < 1:
                 break
     finally:
         capture.release()
         cv2.destroyAllWindows()
 
-    print("\nFinal counts:", ", ".join(f"{c}={counts[c]}" for c in CLASSES))
-    print("Total:", sum(counts.values()))
+    print("\nFinal counts:", ", ".join(f"{c}={session.counts[c]}" for c in CLASSES))
+    print("Total:", sum(session.counts.values()))
     return 0
 
 

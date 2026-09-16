@@ -1,0 +1,15 @@
+# Development tooling for gesture-pacman - install after requirements.txt:
+#
+#     pip install -r requirements-dev.txt
+#     pip install -e . --no-deps
+#
+# Nothing here is needed to play the game; it is what the test, lint and type checks use.
+
+ruff==0.16.7
+mypy==2.3.1
+pytest==9.1.1
+pytest-cov==7.1.0
+coverage==7.16.0
+hypothesis==6.168.0
+pip-audit==2.10.1
+psutil==7.2.2

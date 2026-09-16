@@ -146,16 +146,22 @@ def main():
 def _retired_main():
     parser = argparse.ArgumentParser(description="Prepare the HaGRID-based gesture dataset.")
     parser.add_argument("--per-class", type=int, default=DEFAULT_PER_CLASS)
-    parser.add_argument("--overwrite", action="store_true",
-                        help="delete existing images in the four class folders first")
-    parser.add_argument("--keep-cache", action="store_true",
-                        help="keep the downloaded parquet shards after preparing the dataset")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="delete existing images in the four class folders first",
+    )
+    parser.add_argument(
+        "--keep-cache",
+        action="store_true",
+        help="keep the downloaded parquet shards after preparing the dataset",
+    )
     args = parser.parse_args()
     target = args.per_class
 
-    print(f"HaGRID dataset preparation")
+    print("HaGRID dataset preparation")
     print(f"source : {SOURCE_REPO}")
-    print(f"mapping: " + ", ".join(f"{src} -> {dst}" for dst, src in MAPPING.items()))
+    print("mapping: " + ", ".join(f"{src} -> {dst}" for dst, src in MAPPING.items()))
     print(f"target : {target} images per class, seed {SEED}")
     print("-" * 74)
 
@@ -182,7 +188,7 @@ def _retired_main():
 
     # --- pass 1: collect candidate row references until every class has a deep pool -----
     wanted = {src: dst for dst, src in MAPPING.items()}
-    pool = {label: [] for label in CLASSES}          # label -> [(shard_index, row_index)]
+    pool = {label: [] for label in CLASSES}  # label -> [(shard_index, row_index)]
     label_names = None
     used_shards = []
 
@@ -205,7 +211,7 @@ def _retired_main():
                 return 1
 
         labels = table.column("label").to_pylist()
-        found = {label: 0 for label in CLASSES}
+        found = dict.fromkeys(CLASSES, 0)
         for row_index, value in enumerate(labels):
             name = label_names[value]
             if name in wanted:
@@ -213,14 +219,20 @@ def _retired_main():
                 pool[project_class].append((shard_index, row_index))
                 found[project_class] += 1
         used_shards.append(shard)
-        print("  rows found: " + ", ".join(f"{c}={found[c]}" for c in CLASSES)
-              + " | pool: " + ", ".join(f"{c}={len(pool[c])}" for c in CLASSES))
+        print(
+            "  rows found: "
+            + ", ".join(f"{c}={found[c]}" for c in CLASSES)
+            + " | pool: "
+            + ", ".join(f"{c}={len(pool[c])}" for c in CLASSES)
+        )
         del table
 
     short = [c for c in CLASSES if len(pool[c]) < target]
     if short:
-        print(f"ERROR: not enough source images for {short} "
-              f"(have {[len(pool[c]) for c in short]}, need {target})")
+        print(
+            f"ERROR: not enough source images for {short} "
+            f"(have {[len(pool[c]) for c in short]}, need {target})"
+        )
         return 1
 
     # --- reproducible sampling ----------------------------------------------------------
@@ -234,7 +246,7 @@ def _retired_main():
         for shard_index, row_index in chosen[label]:
             by_shard.setdefault(shard_index, []).append((row_index, label))
 
-    counters = {label: 0 for label in CLASSES}
+    counters = dict.fromkeys(CLASSES, 0)
     seen_hashes = set()
     duplicates = 0
     written = 0
@@ -315,8 +327,11 @@ def _retired_main():
         print("parquet cache removed (use --keep-cache to keep it)")
 
     balanced = len(set(counters.values())) == 1 and all(c == target for c in counters.values())
-    print("RESULT:", "PASS" if balanced else "CHECK",
-          "- dataset is balanced" if balanced else "- counts differ from target, inspect above")
+    print(
+        "RESULT:",
+        "PASS" if balanced else "CHECK",
+        "- dataset is balanced" if balanced else "- counts differ from target, inspect above",
+    )
     return 0 if balanced else 1
 
 

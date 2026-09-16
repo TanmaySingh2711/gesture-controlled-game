@@ -1,0 +1,26 @@
+# Normalise text files to LF in the repository, whatever the contributor's platform.
+* text=auto eol=lf
+
+# Source, configuration and documentation
+*.py     text eol=lf diff=python
+*.md     text eol=lf
+*.toml   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.json   text eol=lf
+*.csv    text eol=lf
+*.txt    text eol=lf
+
+# Windows-only scripts keep their native line endings
+*.bat    text eol=crlf
+*.ps1    text eol=crlf
+
+# Binary artefacts: never diffed, never line-ending converted
+*.pt     binary
+*.pth    binary
+*.onnx   binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.parquet binary

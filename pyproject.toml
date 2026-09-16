@@ -1,0 +1,135 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gesture-pacman"
+version = "1.0.0"
+description = "A Pac-Man-style maze game controlled by hand gestures recognised in real time by a MobileNetV2 CNN."
+readme = "README.md"
+requires-python = ">=3.12"
+# Runtime dependencies live in requirements.txt, because PyTorch must come from the PyTorch
+# CUDA index rather than PyPI. They are deliberately not duplicated here, so there is exactly
+# one place that pins them. Install with:
+#
+#     pip install -r requirements.txt
+#     pip install -r requirements-dev.txt
+#     pip install -e . --no-deps
+dependencies = []
+
+[project.scripts]
+gesture-pacman = "src.play_gesture:main"
+pacman-keyboard = "game.main:main"
+
+[tool.setuptools]
+packages = ["game", "src"]
+
+# ---------------------------------------------------------------------------------------
+# ruff - formatting and linting
+# ---------------------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["archive", "game_archive_endless_runner", "dataset_archive_endless_runner", "venv"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # import order
+    "N",         # naming
+    "B",         # bugbear
+    "UP",        # modern syntax
+    "SIM",       # simplifications
+    "C4",        # comprehensions
+    "RUF",       # ruff-specific
+    "PL",        # pylint
+    "BLE",       # blind except
+    "S",         # security (bandit)
+    "PERF",      # performance anti-patterns
+    "PIE",       # misc
+    "RET",       # return consistency
+    "PGH",       # pygrep hooks (no blanket noqa / type: ignore)
+    "FURB",      # refurb
+    "LOG",       # logging
+    "T10",       # debugger left in
+]
+ignore = [
+    "PLR2004",   # game and model tuning constants are named at module level already
+    "S311",      # `random` drives ghost behaviour and dataset sampling, never security
+    "E501",      # line length is enforced by the formatter's wrapping, not a hard lint
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests import optional heavy dependencies only after pytest.importorskip() has confirmed them.
+"tests/**" = ["S101", "S603", "E402", "PLR0915", "PLR0913", "PLR0917", "PLC0415", "SLF001"]
+# The check scripts import heavy or display-dependent modules only after setting up the
+# environment they are proving something about, and are long linear lists of checks.
+"src/check_*.py" = ["PLR0915", "PLR0912", "PLR0914", "PLC0415"]
+# A diagnostic must report every failure it meets rather than crash on the first one.
+"src/environment_check.py" = ["BLE001", "PLC0415"]
+# Downloads use module-level https constants, validated before any request is made.
+"src/crop_hagrid_hands.py" = ["S310"]
+# The self-test deliberately imports pygame only after forcing the dummy video driver, and
+# is one long, linear script of checks rather than a branching program.
+"game/main.py" = ["PLR0915", "PLR0914", "PLR0912", "PLC0415"]
+# The worker imports OpenCV and the recognizer lazily, inside the thread, so that a keyboard-only
+# process - and the whole `game` package - never loads torch or cv2.
+"src/game_integration.py" = ["PLC0415"]
+# Each profile imports only what it measures: the game profile must not load torch, and the
+# recognizer profile must not initialise pygame.
+"src/measure_memory.py" = ["PLC0415"]
+
+[tool.ruff.lint.pylint]
+max-args = 7
+max-branches = 14
+
+# ---------------------------------------------------------------------------------------
+# mypy - static typing
+# ---------------------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+exclude = ["archive/", "game_archive_endless_runner/", "dataset_archive_endless_runner/", "venv/"]
+
+[[tool.mypy.overrides]]
+# The game package and the real-time application are fully typed.
+module = ["game.*", "src.game_integration", "src.play_gesture", "src.gesture_recognizer"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["cv2.*", "torchvision.*", "sklearn.*", "pyarrow.*", "matplotlib.*", "pygame.*", "psutil.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------------------
+# pytest and coverage
+# ---------------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "gpu: needs the CUDA model (skipped automatically when CUDA is unavailable)",
+    "webcam: needs a physical webcam (skipped unless GESTURE_WEBCAM_TESTS=1)",
+    "slow: takes more than a few seconds",
+]
+
+[tool.coverage.run]
+source = ["game", "src"]
+branch = true
+# The self-test scripts must run in a fresh interpreter (each asserts torch and cv2 were never
+# imported), so tests launch them as subprocesses; this makes their coverage count too.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

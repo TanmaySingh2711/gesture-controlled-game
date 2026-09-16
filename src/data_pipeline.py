@@ -49,6 +49,7 @@ Never apply training augmentation at inference time.
 import json
 import os
 import random
+from typing import Any
 
 import torch
 from PIL import Image
@@ -65,14 +66,14 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 SEED = 42
-MAX_SAFE_ROTATION = 10   # degrees; beyond this an augmented thumbs-up drifts toward sideways
+MAX_SAFE_ROTATION = 10  # degrees; beyond this an augmented thumbs-up drifts toward sideways
 TRAIN_PER_CLASS = 400
 VAL_PER_CLASS = 50
 TEST_PER_CLASS = 50
 
 BATCH_SIZE = 32
-NUM_WORKERS = 2          # conservative and verified stable on this Windows machine
-PIN_MEMORY = True        # batches are copied to CUDA during training
+NUM_WORKERS = 2  # conservative and verified stable on this Windows machine
+PIN_MEMORY = True  # batches are copied to CUDA during training
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
@@ -87,8 +88,8 @@ def build_split(force=False):
         return load_split()
 
     rng = random.Random(SEED)
-    splits = {"train": [], "val": [], "test": []}
-    for name in CLASSES:                       # fixed class order, not os.listdir order
+    splits: dict[str, list[dict[str, Any]]] = {"train": [], "val": [], "test": []}
+    for name in CLASSES:  # fixed class order, not os.listdir order
         folder = os.path.join(DATASET_DIR, name)
         files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".jpg"))
         expected = TRAIN_PER_CLASS + VAL_PER_CLASS + TEST_PER_CLASS
@@ -99,17 +100,19 @@ def build_split(force=False):
         rng.shuffle(shuffled)
         chunks = {
             "train": shuffled[:TRAIN_PER_CLASS],
-            "val": shuffled[TRAIN_PER_CLASS:TRAIN_PER_CLASS + VAL_PER_CLASS],
-            "test": shuffled[TRAIN_PER_CLASS + VAL_PER_CLASS:],
+            "val": shuffled[TRAIN_PER_CLASS : TRAIN_PER_CLASS + VAL_PER_CLASS],
+            "test": shuffled[TRAIN_PER_CLASS + VAL_PER_CLASS :],
         }
         for split, names in chunks.items():
             for file_name in sorted(names):
                 # Relative POSIX-style path so the file is portable across machines.
-                splits[split].append({
-                    "path": f"dataset/{name}/{file_name}",
-                    "label": CLASS_TO_INDEX[name],
-                    "class": name,
-                })
+                splits[split].append(
+                    {
+                        "path": f"dataset/{name}/{file_name}",
+                        "label": CLASS_TO_INDEX[name],
+                        "class": name,
+                    }
+                )
 
     payload = {
         "seed": SEED,
@@ -122,16 +125,21 @@ def build_split(force=False):
         json.dump(payload, handle, indent=1, sort_keys=True)
 
     with open(MAPPING_PATH, "w", encoding="utf-8") as handle:
-        json.dump({
-            "class_to_index": CLASS_TO_INDEX,
-            "index_to_class": {str(i): n for i, n in INDEX_TO_CLASS.items()},
-            "classes": CLASSES,
-            "gesture": {"left": "fist", "right": "palm", "up": "like", "down": "dislike"},
-            "note": "Frozen in P3 for the Pac-Man direction. Training and real-time "
-                    "inference must both use this mapping; never rely on alphabetical "
-                    "folder ordering. There is no neutral class: below-threshold "
-                    "predictions mean 'no new command', not a fifth class.",
-        }, handle, indent=1, sort_keys=True)
+        json.dump(
+            {
+                "class_to_index": CLASS_TO_INDEX,
+                "index_to_class": {str(i): n for i, n in INDEX_TO_CLASS.items()},
+                "classes": CLASSES,
+                "gesture": {"left": "fist", "right": "palm", "up": "like", "down": "dislike"},
+                "note": "Frozen in P3 for the Pac-Man direction. Training and real-time "
+                "inference must both use this mapping; never rely on alphabetical "
+                "folder ordering. There is no neutral class: below-threshold "
+                "predictions mean 'no new command', not a fifth class.",
+            },
+            handle,
+            indent=1,
+            sort_keys=True,
+        )
 
     return payload
 
@@ -146,28 +154,32 @@ def load_split():
 # --- transforms -------------------------------------------------------------------------
 def train_transform():
     """Mild, realistic augmentation. Nothing here may change what a gesture means."""
-    return v2.Compose([
-        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        # Horizontal mirroring changes handedness and viewpoint but never the gesture: a
-        # mirrored fist is a fist, and a mirrored thumbs-up still points up. There is
-        # deliberately no vertical counterpart - see the orientation constraint above.
-        v2.RandomHorizontalFlip(p=0.5),
-        v2.RandomAffine(degrees=MAX_SAFE_ROTATION, translate=(0.05, 0.05), scale=(0.9, 1.1)),
-        v2.ColorJitter(brightness=0.2, contrast=0.2),
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+    return v2.Compose(
+        [
+            v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            # Horizontal mirroring changes handedness and viewpoint but never the gesture: a
+            # mirrored fist is a fist, and a mirrored thumbs-up still points up. There is
+            # deliberately no vertical counterpart - see the orientation constraint above.
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomAffine(degrees=MAX_SAFE_ROTATION, translate=(0.05, 0.05), scale=(0.9, 1.1)),
+            v2.ColorJitter(brightness=0.2, contrast=0.2),
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
 
 
 def eval_transform():
     """Deterministic preprocessing for validation, test and real-time inference."""
-    return v2.Compose([
-        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+    return v2.Compose(
+        [
+            v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
 
 
 def inference_transform():
@@ -196,9 +208,9 @@ class GestureDataset(Dataset):
     def __getitem__(self, index):
         entry = self.entries[index]
         path = os.path.join(PROJECT_ROOT, entry["path"].replace("/", os.sep))
-        with Image.open(path) as image:
-            image = image.convert("RGB")
-            return self.transform(image), entry["label"]
+        with Image.open(path) as source:
+            image = source.convert("RGB")
+        return self.transform(image), entry["label"]
 
 
 def get_datasets(split=None):

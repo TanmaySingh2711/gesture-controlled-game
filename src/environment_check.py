@@ -19,10 +19,10 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 MIN_PYTHON = (3, 9)
 MAX_PYTHON = (3, 12)
 
-results = []
+results: list[tuple[str, bool, str]] = []
 
 
-def record(name, passed, detail):
+def record(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     status = "PASS" if passed else "FAIL"
     print(f"[{status}] {name:<18} {detail}")
@@ -32,7 +32,11 @@ def check_python():
     v = sys.version_info
     version = f"{v.major}.{v.minor}.{v.micro}"
     ok = MIN_PYTHON <= (v.major, v.minor) <= MAX_PYTHON
-    detail = version if ok else f"{version} (expected {MIN_PYTHON[0]}.{MIN_PYTHON[1]}-{MAX_PYTHON[0]}.{MAX_PYTHON[1]})"
+    detail = (
+        version
+        if ok
+        else f"{version} (expected {MIN_PYTHON[0]}.{MIN_PYTHON[1]}-{MAX_PYTHON[0]}.{MAX_PYTHON[1]})"
+    )
     record("Python", ok, detail)
 
 
@@ -58,27 +62,49 @@ def check_torch_and_cuda():
     print(f"       built against CUDA {torch.version.cuda}")
 
     if not torch.cuda.is_available():
-        record("CUDA available", False, "torch.cuda.is_available() is False - GPU build or driver missing")
+        record(
+            "CUDA available",
+            False,
+            "torch.cuda.is_available() is False - GPU build or driver missing",
+        )
         return
-    record("CUDA available", True, f"True (CUDA runtime {torch.version.cuda}, cuDNN {torch.backends.cudnn.version()})")
+    record(
+        "CUDA available",
+        True,
+        f"True (CUDA runtime {torch.version.cuda}, cuDNN {torch.backends.cudnn.version()})",
+    )
 
     name = torch.cuda.get_device_name(0)
     props = torch.cuda.get_device_properties(0)
-    vram_gb = props.total_memory / (1024 ** 3)
-    record("GPU", True, f"{name} | {vram_gb:.2f} GB VRAM | compute capability {props.major}.{props.minor}")
+    vram_gb = props.total_memory / (1024**3)
+    record(
+        "GPU",
+        True,
+        f"{name} | {vram_gb:.2f} GB VRAM | compute capability {props.major}.{props.minor}",
+    )
 
     # Allocation and a real computation on the device, not just a capability flag.
     try:
         device = torch.device("cuda")
         a = torch.randn(512, 512, device=device)
         b = torch.randn(512, 512, device=device)
-        record("CUDA allocation", True, f"allocated {torch.cuda.memory_allocated() / 1024**2:.1f} MB on device 0")
+        record(
+            "CUDA allocation",
+            True,
+            f"allocated {torch.cuda.memory_allocated() / 1024**2:.1f} MB on device 0",
+        )
 
         c = a @ b
         torch.cuda.synchronize()
-        assert c.device.type == "cuda", "result tensor did not stay on the GPU"
-        assert c.shape == (512, 512)
-        record("CUDA computation", True, f"512x512 matmul on {c.device}, result mean {c.mean().item():.4f}")
+        if c.device.type != "cuda":
+            raise RuntimeError("result tensor did not stay on the GPU")
+        if c.shape != (512, 512):
+            raise RuntimeError(f"unexpected result shape {tuple(c.shape)}")
+        record(
+            "CUDA computation",
+            True,
+            f"512x512 matmul on {c.device}, result mean {c.mean().item():.4f}",
+        )
 
         del a, b, c
         torch.cuda.empty_cache()
