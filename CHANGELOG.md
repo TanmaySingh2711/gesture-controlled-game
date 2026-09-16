@@ -5,6 +5,18 @@ each verified before the next began; the entries below follow those phases.
 
 ## [Unreleased] - quality and rigour round
 
+### Removed
+- **Every remaining endless-runner artefact**, now that the project is fully the Pac-Man game:
+  `game_archive_endless_runner/`, `dataset_archive_endless_runner/` (1,005 images) and
+  `model/archive_endless_runner/` (the retired checkpoint and its README). The checkpoint's only
+  remaining role was one narrow regression check (the loader refuses it by class mapping, not
+  just by looking different); that guard is still tested, now with a small synthetic checkpoint
+  instead of the retired file, so no coverage was lost. Also removed: the dead
+  `GestureRecognizer` alias, leftover `model/` files from the old model's training run (fully
+  superseded by the `direction_*`-prefixed Pac-Man files), the one-off `--quick` study report,
+  and the four QA image sheets that regenerate on every run of the check scripts (now
+  gitignored instead of committed).
+
 ### Added
 - **Accessibility:** high-contrast and colour-blind-safe themes (`C`), checked by tests for WCAG
   contrast and for simulated protanopia, deuteranopia and tritanopia; frightened ghosts now also

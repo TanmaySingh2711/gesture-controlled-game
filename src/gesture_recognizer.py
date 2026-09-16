@@ -239,11 +239,6 @@ class DirectionRecognizer:
         self.previous_stable = None
 
 
-# Backwards-compatible alias. The class was called GestureRecognizer while the project was a
-# gesture-named endless runner; the concept is now a direction request.
-GestureRecognizer = DirectionRecognizer
-
-
 def open_camera(index: int = 0) -> Any:
     """Open the webcam at the frozen capture size. Returns a `cv2.VideoCapture`."""
     backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY

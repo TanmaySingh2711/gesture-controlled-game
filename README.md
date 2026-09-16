@@ -243,9 +243,6 @@ gesture-controlled-game/
 └── PROJECT_SPEC.md  FINAL_TEST_REPORT.md
 ```
 
-The endless-runner version this project grew out of is archived in `game_archive_endless_runner/`
-and `dataset_archive_endless_runner/`; nothing reads them.
-
 ## Credits
 
 Hand images: HaGRID, Kapitanov et al., licensed CC-BY-SA-4.0. Model weights: torchvision's

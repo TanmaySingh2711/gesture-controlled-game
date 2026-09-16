@@ -637,7 +637,7 @@ def transitions(recognizer, repeats, out_path):
 
 
 def _selftest_model(recognizer, check):
-    """Checkpoint identity, device, the obsolete-checkpoint guard and preprocessing parity."""
+    """Checkpoint identity, device, and preprocessing parity."""
     meta = recognizer.metadata
     check(
         "checkpoint",
@@ -657,21 +657,6 @@ def _selftest_model(recognizer, check):
         device.type == "cuda",
         f"{device}, eval mode {not recognizer.model.training}",
     )
-
-    # The obsolete checkpoint must be refused, not merely different.
-    obsolete = os.path.join(MODEL_DIR, "archive_endless_runner", "best_gesture_model_OBSOLETE.pt")
-    if os.path.exists(obsolete):
-        try:
-            DirectionRecognizer(checkpoint_path=obsolete)
-            check("obsolete rejected", False, "the obsolete checkpoint loaded")
-        except RuntimeError as error:
-            check(
-                "obsolete rejected",
-                "Refusing to load" in str(error),
-                "guard refused the endless-runner checkpoint",
-            )
-    else:
-        check("obsolete rejected", True, "obsolete checkpoint not present")
 
     # Preprocessing parity: the webcam path must build the same tensor as the evaluation path.
     sample = os.path.join(PROJECT_ROOT, "dataset", "left", "left_00003.jpg")

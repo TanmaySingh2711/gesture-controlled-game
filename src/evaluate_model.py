@@ -58,7 +58,6 @@ CONFUSION_PATH = os.path.join(MODEL_DIR, "direction_confusion_matrix.png")
 PREDICTIONS_PATH = os.path.join(MODEL_DIR, "direction_test_predictions.csv")
 MISCLASSIFIED_PATH = os.path.join(MODEL_DIR, "direction_misclassified_samples.png")
 LOW_CONFIDENCE_PATH = os.path.join(MODEL_DIR, "direction_low_confidence_correct.png")
-OBSOLETE_PATH = os.path.join(MODEL_DIR, "archive_endless_runner", "best_gesture_model_OBSOLETE.pt")
 
 CLASSES = list(CLASS_TO_INDEX)  # left, right, up, down - fixed order
 NUM_CLASSES = len(CLASSES)
@@ -101,18 +100,6 @@ def load_model(device):
         raise RuntimeError("checkpoint metadata mismatch: " + ", ".join(problems))
 
     return model, payload
-
-
-def verify_obsolete_rejected():
-    """The guard must refuse the retired four-output checkpoint, not merely differ from it."""
-    if not os.path.exists(OBSOLETE_PATH):
-        return True, "obsolete checkpoint not present to test against"
-    try:
-        # Skip the digest check, so it is the class-mapping guard that must refuse this file.
-        load_direction_checkpoint(OBSOLETE_PATH, expected_sha256=None)
-    except RuntimeError as error:
-        return "Refusing to load" in str(error), "guard rejected the obsolete checkpoint"
-    return False, "the obsolete checkpoint loaded without complaint"
 
 
 def verify_test_split(split):
@@ -319,7 +306,6 @@ class SplitInfo:
     name: str
     tally: dict[str, int]
     overlap: int
-    guard_ok: bool
 
 
 @dataclass(frozen=True)
@@ -341,7 +327,6 @@ class EvaluationRecord:
     entries: list[dict[str, Any]]
     tally: dict[str, int]
     overlap: int
-    guard_ok: bool
     payload: dict[str, Any]
     model_on_cuda: bool
     model_in_eval: bool
@@ -641,7 +626,7 @@ def write_metrics(record, path):
 
 def run_evaluation(model, payload, entries, device, paths, split):
     """Evaluate `entries` and write every artefact to `paths`. Returns what was measured."""
-    split_name, tally, overlap, guard_ok = split.name, split.tally, split.overlap, split.guard_ok
+    split_name, tally, overlap = split.name, split.tally, split.overlap
     loader = DataLoader(
         GestureDataset(entries, eval_transform()),
         batch_size=BATCH_SIZE,
@@ -697,7 +682,6 @@ def run_evaluation(model, payload, entries, device, paths, split):
         entries=entries,
         tally=tally,
         overlap=overlap,
-        guard_ok=guard_ok,
         payload=payload,
         model_on_cuda=next(model.parameters()).device.type == "cuda",
         model_in_eval=not model.training,
@@ -725,11 +709,10 @@ def run_evaluation(model, payload, entries, device, paths, split):
 
 
 def safety_checks(record):
-    """The fifteen conditions a trustworthy evaluation must meet. Returns a process exit code."""
+    """The fourteen conditions a trustworthy evaluation must meet. Returns a process exit code."""
     results, total = record.results, len(record.entries)
     checks = [
         ("checkpoint mapping matches active", record.payload["class_to_index"] == CLASS_TO_INDEX),
-        ("obsolete checkpoint rejected", record.guard_ok),
         ("CUDA inference", record.model_on_cuda),
         ("model in eval mode", record.model_in_eval),
         (f"frozen {record.split_name} split, 200 images", results["total"] == 200),
@@ -774,9 +757,6 @@ def main():
     model, payload = load_model(device)
     _print_model(model, payload)
 
-    guard_ok, guard_detail = verify_obsolete_rejected()
-    print(f"guard          : [{'PASS' if guard_ok else 'FAIL'}] {guard_detail}")
-
     split = load_split()
     tally, overlap = verify_test_split(split)
     record = run_evaluation(
@@ -785,7 +765,7 @@ def main():
         split["splits"]["test"],
         device,
         EvaluationPaths(),
-        SplitInfo("test", tally, overlap, guard_ok),
+        SplitInfo("test", tally, overlap),
     )
     return safety_checks(record)
 

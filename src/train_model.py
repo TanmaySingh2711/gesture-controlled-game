@@ -597,23 +597,7 @@ def verify_checkpoint(batch_size):
     )
     print(f"  [{'PASS' if on_cuda else 'FAIL'}] model output on {outputs.device}")
 
-    try:
-        # Skip the digest check, so it is the class-mapping guard that must refuse this file.
-        load_direction_checkpoint(
-            os.path.join(MODEL_DIR, "archive_endless_runner", "best_gesture_model_OBSOLETE.pt"),
-            expected_sha256=None,
-        )
-        guard_ok = False
-        detail = "the obsolete checkpoint loaded without complaint"
-    except FileNotFoundError:
-        guard_ok = True
-        detail = "obsolete checkpoint not present to test against"
-    except RuntimeError as error:
-        guard_ok = "Refusing to load" in str(error)
-        detail = "guard rejected the obsolete left/right/jump/neutral checkpoint"
-    print(f"  [{'PASS' if guard_ok else 'FAIL'}] {detail}")
-
-    return shape_ok and finite and on_cuda and ok and guard_ok
+    return shape_ok and finite and on_cuda and ok
 
 
 def main():

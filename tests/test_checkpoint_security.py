@@ -12,13 +12,9 @@ torch = pytest.importorskip("torch")
 from src.train_model import (
     CHECKPOINT_PATH,
     FROZEN_CHECKPOINT_SHA256,
-    MODEL_DIR,
     file_sha256,
     load_direction_checkpoint,
 )
-
-OBSOLETE = Path(MODEL_DIR) / "archive_endless_runner" / "best_gesture_model_OBSOLETE.pt"
-needs_obsolete = pytest.mark.skipif(not OBSOLETE.exists(), reason="retired checkpoint not present")
 
 
 def test_frozen_checkpoint_matches_its_pinned_digest() -> None:
@@ -41,17 +37,13 @@ def test_a_single_flipped_byte_is_refused(tmp_path: Path) -> None:
         load_direction_checkpoint(str(tampered))
 
 
-@needs_obsolete
-def test_retired_checkpoint_is_refused_by_the_digest() -> None:
-    with pytest.raises(RuntimeError, match="not the frozen checkpoint"):
-        load_direction_checkpoint(str(OBSOLETE))
-
-
-@needs_obsolete
-def test_retired_checkpoint_is_refused_by_its_class_mapping_as_well() -> None:
-    """With the digest check skipped, the mapping guard alone must still stop it."""
+def test_a_different_class_mapping_is_refused_even_with_the_right_shape(tmp_path: Path) -> None:
+    """A shape check alone is not enough: a four-output checkpoint trained for different
+    gestures would load cleanly and then silently mean the wrong thing at two indices."""
+    mismatched = tmp_path / "mismatched.pt"
+    torch.save({"class_to_index": {"left": 0, "right": 1, "jump": 2, "neutral": 3}}, mismatched)
     with pytest.raises(RuntimeError, match="was trained for"):
-        load_direction_checkpoint(str(OBSOLETE), expected_sha256=None)
+        load_direction_checkpoint(str(mismatched), expected_sha256=None)
 
 
 class _Payload:

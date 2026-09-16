@@ -57,7 +57,7 @@ def test_pipeline_runs_on_validation_without_touching_the_p5_artefacts(tmp_path:
         entries,
         device,
         paths,
-        ev.SplitInfo("validation", tally, overlap=0, guard_ok=True),
+        ev.SplitInfo("validation", tally, overlap=0),
     )
 
     assert record.results["total"] == 200
