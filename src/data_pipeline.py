@@ -82,9 +82,18 @@ MAPPING_PATH = os.path.join(PROJECT_ROOT, "class_mapping.json")
 
 
 # --- split ------------------------------------------------------------------------------
-def build_split(force=False):
-    """Create the deterministic stratified split and persist it. Returns the split dict."""
-    if os.path.exists(SPLIT_PATH) and not force:
+def build_split(
+    force: bool = False, *, split_path: str | None = None, mapping_path: str | None = None
+) -> dict[str, Any]:
+    """Create the deterministic stratified split and persist it. Returns the split dict.
+
+    Files are always written with LF line endings, so a rebuild is byte-identical on every
+    platform. `split_path` and `mapping_path` redirect the output, which lets a check rebuild
+    the split somewhere else instead of overwriting the committed files.
+    """
+    split_path = split_path or SPLIT_PATH
+    mapping_path = mapping_path or MAPPING_PATH
+    if os.path.exists(split_path) and not force:
         return load_split()
 
     rng = random.Random(SEED)
@@ -121,10 +130,10 @@ def build_split(force=False):
         "counts": {split: len(items) for split, items in splits.items()},
         "splits": splits,
     }
-    with open(SPLIT_PATH, "w", encoding="utf-8") as handle:
+    with open(split_path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, indent=1, sort_keys=True)
 
-    with open(MAPPING_PATH, "w", encoding="utf-8") as handle:
+    with open(mapping_path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(
             {
                 "class_to_index": CLASS_TO_INDEX,
@@ -144,15 +153,16 @@ def build_split(force=False):
     return payload
 
 
-def load_split():
+def load_split() -> dict[str, Any]:
     if not os.path.exists(SPLIT_PATH):
         raise FileNotFoundError(f"{SPLIT_PATH} is missing - run build_split() first.")
     with open(SPLIT_PATH, encoding="utf-8") as handle:
-        return json.load(handle)
+        split: dict[str, Any] = json.load(handle)
+    return split
 
 
 # --- transforms -------------------------------------------------------------------------
-def train_transform():
+def train_transform() -> v2.Compose:
     """Mild, realistic augmentation. Nothing here may change what a gesture means."""
     return v2.Compose(
         [
@@ -170,7 +180,7 @@ def train_transform():
     )
 
 
-def eval_transform():
+def eval_transform() -> v2.Compose:
     """Deterministic preprocessing for validation, test and real-time inference."""
     return v2.Compose(
         [
@@ -182,12 +192,12 @@ def eval_transform():
     )
 
 
-def inference_transform():
+def inference_transform() -> v2.Compose:
     """Alias used by webcam code, so the contract is impossible to miss."""
     return eval_transform()
 
 
-def denormalize(tensor):
+def denormalize(tensor: torch.Tensor) -> torch.Tensor:
     """Undo ImageNet normalization so a tensor can be viewed as an image."""
     mean = torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
     std = torch.tensor(IMAGENET_STD).view(3, 1, 1)
@@ -195,17 +205,17 @@ def denormalize(tensor):
 
 
 # --- dataset ----------------------------------------------------------------------------
-class GestureDataset(Dataset):
+class GestureDataset(Dataset[tuple[torch.Tensor, int]]):
     """Reads the images named by one split entry list, applying `transform` on the fly."""
 
-    def __init__(self, entries, transform):
+    def __init__(self, entries: list[dict[str, Any]], transform: v2.Compose) -> None:
         self.entries = entries
         self.transform = transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entries)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
         entry = self.entries[index]
         path = os.path.join(PROJECT_ROOT, entry["path"].replace("/", os.sep))
         with Image.open(path) as source:
@@ -213,7 +223,9 @@ class GestureDataset(Dataset):
         return self.transform(image), entry["label"]
 
 
-def get_datasets(split=None):
+def get_datasets(
+    split: dict[str, Any] | None = None,
+) -> tuple[GestureDataset, GestureDataset, GestureDataset]:
     split = split or build_split()
     return (
         GestureDataset(split["splits"]["train"], train_transform()),
@@ -222,10 +234,12 @@ def get_datasets(split=None):
     )
 
 
-def get_dataloaders(batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY):
+def get_dataloaders(
+    batch_size: int = BATCH_SIZE, num_workers: int = NUM_WORKERS, pin_memory: bool = PIN_MEMORY
+) -> tuple[DataLoader[Any], DataLoader[Any], DataLoader[Any]]:
     """Train loader shuffles; validation and test stay in a fixed order."""
     train_set, val_set, test_set = get_datasets()
-    common = {
+    common: dict[str, Any] = {
         "batch_size": batch_size,
         "num_workers": num_workers,
         "pin_memory": pin_memory,

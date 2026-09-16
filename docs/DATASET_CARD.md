@@ -115,7 +115,7 @@ still be brighter on top after augmentation.
   2. Place every intact image at its exact position in that replay.
   3. Accept a source only if it is the one candidate between the damaged file's neighbours that
      matches no intact image.
-  
+
   The lineage audit later matched the restored `left` image to its HaGRID source independently.
   The evaluation test now hashes every dataset image before and after it runs.
 

@@ -11,6 +11,7 @@ screen is rendered in every state to prove nothing raises or falls off the panel
 import os
 import sys
 import time
+from typing import Any
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -43,12 +44,14 @@ from src.play_gesture import (
 results: list[tuple[str, bool, str]] = []
 
 
-def check(name, passed, detail):
+def check(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     print(f"[{'PASS' if passed else 'FAIL'}] {name:<34} {detail}")
 
 
-def publish(state, command, now, sequence=1, **extra):
+def publish(
+    state: SharedState, command: str | None, now: float, sequence: int = 1, **extra: Any
+) -> None:
     state.publish(
         sequence=sequence,
         timestamp=now,
@@ -63,7 +66,20 @@ def publish(state, command, now, sequence=1, **extra):
     )
 
 
-def wired(use_camera=True):
+def controller_of(app: GesturePacman) -> GestureController:
+    if app.controller is None:
+        raise RuntimeError("the application under test has no gesture controller")
+    return app.controller
+
+
+def banner(game: Game) -> tuple[str, list[str]]:
+    lines = game.banner_lines()
+    if lines is None:
+        raise RuntimeError(f"no banner in state {game.state!r}")
+    return lines
+
+
+def wired(use_camera: bool = True) -> tuple[GesturePacman, SharedState]:
     """An application with a controller but no worker: real UI, faked recognition."""
     app = GesturePacman(use_camera=False)  # never opens a camera or loads the model
     app.use_camera = use_camera
@@ -72,7 +88,7 @@ def wired(use_camera=True):
     return app, state
 
 
-def main():
+def main() -> int:
     # --- the start screen -------------------------------------------------------------
     app, state = wired()
     on_start = app.phase == "start"
@@ -118,14 +134,14 @@ def main():
     shown = []
     for index, command in enumerate(("left", "right", "up", "down"), start=1):
         publish(state, command, time.perf_counter(), sequence=index)
-        snapshot, fresh = app.controller.poll()
+        snapshot, fresh = controller_of(app).poll()
         shown.append(command_text(snapshot, fresh, True))
         app.draw_panel()
     check("four commands display", shown == ["LEFT", "RIGHT", "UP", "DOWN"], ", ".join(shown))
 
     # --- None, waiting, error, off ----------------------------------------------------
     publish(state, None, time.perf_counter(), sequence=5)
-    snapshot, fresh = app.controller.poll()
+    snapshot, fresh = controller_of(app).poll()
     none_text = command_text(snapshot, fresh, True)
     none_conf = confidence_text(snapshot, fresh, True)
     check(
@@ -135,7 +151,7 @@ def main():
     )
 
     stale = time.perf_counter() + STALE_SECONDS + 0.1
-    snapshot, fresh = app.controller.poll(stale)
+    snapshot, fresh = controller_of(app).poll(stale)
     waiting = command_text(snapshot, fresh, True)
     waiting_status = control_status(snapshot, fresh, True)
     check(
@@ -147,7 +163,7 @@ def main():
     )
 
     state.publish(camera_ok=False, status="camera error", error="device lost", stable_command=None)
-    snapshot, fresh = app.controller.poll()
+    snapshot, fresh = controller_of(app).poll()
     error_text = command_text(snapshot, fresh, True)
     error_status = control_status(snapshot, fresh, True)
     app.draw_panel()  # the two extra lines must still fit
@@ -158,7 +174,7 @@ def main():
     )
 
     off_app, _ = wired(use_camera=False)
-    snapshot, fresh = off_app.controller.poll()
+    snapshot, fresh = controller_of(off_app).poll()
     check(
         "keyboard-only reads OFF",
         command_text(snapshot, fresh, False) == "GESTURE OFF"
@@ -168,7 +184,7 @@ def main():
 
     # --- confidence only when it means something --------------------------------------
     publish(state, "up", time.perf_counter(), sequence=9)
-    snapshot, fresh = app.controller.poll()
+    snapshot, fresh = controller_of(app).poll()
     check(
         "confidence shown for a command",
         confidence_text(snapshot, fresh, True) == "Confidence: 98.6%",
@@ -201,16 +217,16 @@ def main():
 
     # --- every state's banner ---------------------------------------------------------
     game.state = READY
-    ready_banner = game.banner_lines()
+    ready_banner = banner(game)
     game.state = DYING
     game.lives = 2
-    dying_banner = game.banner_lines()
+    dying_banner = banner(game)
     game.state = ROUND_CLEAR
     game.round = 2
-    round_banner = game.banner_lines()
+    round_banner = banner(game)
     game.state = GAME_OVER
     game.score = 4560
-    over_banner = game.banner_lines()
+    over_banner = banner(game)
     game.state = PLAYING
     playing_banner = game.banner_lines()
 

@@ -6,6 +6,14 @@ each verified before the next began; the entries below follow those phases.
 ## [Unreleased] - quality and rigour round
 
 ### Removed
+- `pyarrow`, which only the retired parquet-based dataset script used. Removed from
+  `requirements.txt`, CI and the mypy config; the full test suite passes without it installed.
+- Dead code found by a dead-code scan: `Ghost.body_color()` and its colour constants
+  (duplicated by the themed `Game.ghost_body_color()`, which is what actually draws, and is now
+  what the test checks, in every theme), nine unused palette aliases in `engine.py`, and the
+  unused `Maze.is_door()` / `Maze.is_house()`.
+- Empty `game/.gitkeep` and `model/.gitkeep` files (both folders have tracked files), and
+  TensorFlow-era patterns (`*.h5`, `*.keras`, `*.tflite`, `*.pb`, `*.ckpt`) from `.gitignore`.
 - **Every remaining endless-runner artefact**, now that the project is fully the Pac-Man game:
   `game_archive_endless_runner/`, `dataset_archive_endless_runner/` (1,005 images) and
   `model/archive_endless_runner/` (the retired checkpoint and its README). The checkpoint's only
@@ -54,6 +62,15 @@ each verified before the next began; the entries below follow those phases.
   part of the test run.
 
 ### Changed
+- **Every module is fully type-annotated**, and mypy now enforces it project-wide
+  (`disallow_untyped_defs`), not just in the game and application modules. Doing so surfaced and
+  fixed several real gaps: an optimizer or gradient scaler that could be `None` during training,
+  a missing sample image that would have crashed the recognizer self-test instead of failing it,
+  and check scripts that indexed a banner or controller without handling its absence.
+- Pillow is pinned in `requirements.txt` and CI, since the code imports it directly.
+- The QA image sheets written by `check_dataset.py` and `check_data_pipeline.py` go to
+  `reports/qa/` (gitignored) instead of the project root.
+- `.gitignore` rewritten into clear groups, with accurate comments.
 - `game/game.py` is now `game/engine.py`, and every module uses package imports instead of
   editing `sys.path`.
 - The static maze is pre-rendered with connected wall outlines: a headless frame went from 2.9 ms
@@ -64,6 +81,11 @@ each verified before the next began; the entries below follow those phases.
 - `prepare_hagrid_dataset.py` moved to `archive/retired_scripts/`.
 
 ### Fixed
+- `check_data_pipeline.py`'s split-regeneration check **overwrote the frozen `data_splits.json`**
+  on every run, and failed on Windows after a fresh checkout because the rebuild wrote CRLF line
+  endings where git had checked out LF. The split writer now always writes LF, and the check
+  rebuilds into a temporary folder and compares, so the committed files are never touched.
+  Generated JSON reports are likewise written with LF and a final newline on every platform.
 - Ghosts were seeded with `hash(role)`, which Python randomises per process, so frightened ghosts
   behaved differently on every launch.
 - `python game/main.py --fps` crashed after the package rename.

@@ -187,7 +187,7 @@ def write_report(section: str, result: dict[str, Any]) -> None:
         report = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
     report[section] = result
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    REPORT_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def main() -> int:

@@ -101,16 +101,6 @@ DYING: Final = "dying"
 ROUND_CLEAR: Final = "round_clear"
 GAME_OVER: Final = "game_over"
 
-# --- palette (the classic theme; kept as module names for code that imports them) ----------
-BACKGROUND: Final = CLASSIC.background
-WALL_COLOR: Final = CLASSIC.wall_fill
-WALL_EDGE: Final = CLASSIC.wall_edge
-DOOR_COLOR: Final = CLASSIC.door
-PELLET_COLOR: Final = CLASSIC.pellet
-POWER_COLOR: Final = CLASSIC.power
-PLAYER_COLOR: Final = CLASSIC.player
-TEXT_COLOR: Final = CLASSIC.text
-DIM_TEXT: Final = CLASSIC.dim_text
 
 WALL_INSET: Final = 4  # px between a wall tile's edge and its outline
 

@@ -68,12 +68,12 @@ BENCHMARK_RUNS = 300
 LOW_CONFIDENCE_SHOWN = 6
 
 
-def require_cuda():
+def require_cuda() -> None:
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU is required for CNN evaluation.")
 
 
-def load_model(device):
+def load_model(device: torch.device) -> tuple[nn.Module, dict[str, Any]]:
     """Fresh architecture + saved weights. The checkpoint file is never modified.
 
     Identity is checked before anything is evaluated: a checkpoint that is the right shape
@@ -102,7 +102,7 @@ def load_model(device):
     return model, payload
 
 
-def verify_test_split(split):
+def verify_test_split(split: dict[str, Any]) -> tuple[dict[str, int], int]:
     """The test split must be the frozen P3 one: 200 images, 50 per class, disjoint."""
     entries = split["splits"]["test"]
     tally = {name: sum(1 for e in entries if e["class"] == name) for name in CLASSES}
@@ -123,7 +123,7 @@ def verify_test_split(split):
 
 
 @torch.inference_mode()
-def evaluate(model, loader, device):
+def evaluate(model: nn.Module, loader: DataLoader[Any], device: torch.device) -> dict[str, Any]:
     """One pass over the test split. No gradients, no optimizer, no weight update."""
     criterion = nn.CrossEntropyLoss(reduction="sum")
     total_loss, correct, seen = 0.0, 0, 0
@@ -163,7 +163,11 @@ def evaluate(model, loader, device):
     }
 
 
-def plot_confusion(matrix, path=CONFUSION_PATH, subject="test set (200 images, four directions)"):
+def plot_confusion(
+    matrix: np.ndarray,
+    path: str = CONFUSION_PATH,
+    subject: str = "test set (200 images, four directions)",
+) -> None:
     fig, ax = plt.subplots(figsize=(7.2, 5.8))
     image = ax.imshow(matrix, cmap="Blues")
     fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="images")
@@ -196,7 +200,9 @@ def plot_confusion(matrix, path=CONFUSION_PATH, subject="test set (200 images, f
     plt.close(fig)
 
 
-def plot_misclassified(entries, results, path=MISCLASSIFIED_PATH):
+def plot_misclassified(
+    entries: list[dict[str, Any]], results: dict[str, Any], path: str = MISCLASSIFIED_PATH
+) -> int:
     wrong = [
         i for i, (t, p) in enumerate(zip(results["true"], results["pred"], strict=True)) if t != p
     ]
@@ -231,7 +237,12 @@ def plot_misclassified(entries, results, path=MISCLASSIFIED_PATH):
     return len(wrong)
 
 
-def plot_low_confidence_correct(entries, results, indices, path=LOW_CONFIDENCE_PATH):
+def plot_low_confidence_correct(
+    entries: list[dict[str, Any]],
+    results: dict[str, Any],
+    indices: list[int],
+    path: str = LOW_CONFIDENCE_PATH,
+) -> None:
     """The correct predictions the model was least sure about.
 
     These are the offline samples closest to the decision boundary, so they are the ones
@@ -264,7 +275,9 @@ def plot_low_confidence_correct(entries, results, indices, path=LOW_CONFIDENCE_P
 
 
 @torch.inference_mode()
-def benchmark(model, device, batch=1, runs=BENCHMARK_RUNS):
+def benchmark(
+    model: nn.Module, device: torch.device, batch: int = 1, runs: int = BENCHMARK_RUNS
+) -> dict[str, Any]:
     """CNN-only forward-pass latency: no webcam, no OpenCV, no Pygame, no disk I/O.
 
     Timed with CUDA events around each individual pass, so the result is a distribution
@@ -350,7 +363,7 @@ class EvaluationRecord:
     throughput: dict[str, Any]
 
 
-def _print_model(model, payload):
+def _print_model(model: nn.Module, payload: dict[str, Any]) -> None:
     parameter_device = next(model.parameters()).device
     print(
         f"checkpoint     : {os.path.relpath(CHECKPOINT_PATH, PROJECT_ROOT)} "
@@ -372,7 +385,7 @@ def _print_model(model, payload):
     )
 
 
-def classification_report(true, pred, total):
+def classification_report(true: np.ndarray, pred: np.ndarray, total: int) -> tuple[Any, ...]:
     precision, recall, f1, support = precision_recall_fscore_support(
         true, pred, labels=list(range(NUM_CLASSES)), zero_division=0
     )
@@ -391,7 +404,9 @@ def classification_report(true, pred, total):
     return precision, recall, f1, support, macro, weighted
 
 
-def confusion_report(true, pred, path, subject):
+def confusion_report(
+    true: np.ndarray, pred: np.ndarray, path: str, subject: str
+) -> tuple[np.ndarray, dict[str, int]]:
     matrix = confusion_matrix(true, pred, labels=list(range(NUM_CLASSES)))
     print(f"confusion matrix (rows = true, columns = predicted, order {'/'.join(CLASSES)}):")
     for index, row in enumerate(matrix):
@@ -419,7 +434,14 @@ def confusion_report(true, pred, path, subject):
     return matrix, pairs
 
 
-def write_predictions(entries, true, pred, confidence, probabilities, path):
+def write_predictions(
+    entries: list[dict[str, Any]],
+    true: Any,
+    pred: Any,
+    confidence: Any,
+    probabilities: Any,
+    path: str,
+) -> None:
     with open(path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(
@@ -450,7 +472,7 @@ def write_predictions(entries, true, pred, confidence, probabilities, path):
     print(f"  saved {os.path.relpath(path, PROJECT_ROOT)} ({len(entries)} rows)")
 
 
-def describe(values):
+def describe(values: Any) -> dict[str, float] | None:
     if not len(values):
         return None
     return {
@@ -462,9 +484,9 @@ def describe(values):
     }
 
 
-def confidence_report(confidence, correct_mask):
+def confidence_report(confidence: np.ndarray, correct_mask: np.ndarray) -> dict[str, Any]:
     """Descriptive only - never used to tune a threshold."""
-    stats = {
+    stats: dict[str, Any] = {
         "correct": describe(confidence[correct_mask]),
         "incorrect": describe(confidence[~correct_mask]),
         "overall_mean": float(confidence.mean()),
@@ -490,7 +512,9 @@ def confidence_report(confidence, correct_mask):
     return stats
 
 
-def lowest_confidence_report(entries, results, correct_mask, path):
+def lowest_confidence_report(
+    entries: list[dict[str, Any]], results: dict[str, Any], correct_mask: np.ndarray, path: str
+) -> list[dict[str, Any]]:
     """The correct predictions nearest the decision boundary - borderline, not errors."""
     confidence = np.array(results["confidence"])
     true = np.array(results["true"])
@@ -522,7 +546,7 @@ def lowest_confidence_report(entries, results, correct_mask, path):
     return records
 
 
-def latency_report(model, device):
+def latency_report(model: nn.Module, device: torch.device) -> tuple[dict[str, Any], dict[str, Any]]:
     latency = benchmark(model, device, batch=1)
     throughput = benchmark(model, device, batch=32, runs=100)
     print()
@@ -539,7 +563,7 @@ def latency_report(model, device):
     return latency, throughput
 
 
-def write_metrics(record, path):
+def write_metrics(record: EvaluationRecord, path: str) -> None:
     payload = record.payload
     results = record.results
     metrics = {
@@ -624,7 +648,14 @@ def write_metrics(record, path):
     print(f"  saved {os.path.relpath(path, PROJECT_ROOT)}")
 
 
-def run_evaluation(model, payload, entries, device, paths, split):
+def run_evaluation(
+    model: nn.Module,
+    payload: dict[str, Any],
+    entries: list[dict[str, Any]],
+    device: torch.device,
+    paths: EvaluationPaths,
+    split: SplitInfo,
+) -> EvaluationRecord:
     """Evaluate `entries` and write every artefact to `paths`. Returns what was measured."""
     split_name, tally, overlap = split.name, split.tally, split.overlap
     loader = DataLoader(
@@ -708,7 +739,7 @@ def run_evaluation(model, payload, entries, device, paths, split):
     return record
 
 
-def safety_checks(record):
+def safety_checks(record: EvaluationRecord) -> int:
     """The fourteen conditions a trustworthy evaluation must meet. Returns a process exit code."""
     results, total = record.results, len(record.entries)
     checks = [
@@ -746,7 +777,7 @@ def safety_checks(record):
     return 0
 
 
-def main():
+def main() -> int:
     require_cuda()
     device = torch.device("cuda")
 

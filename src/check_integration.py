@@ -11,6 +11,7 @@ the part most likely to be wrong and the hardest to judge by playing.
 import os
 import sys
 import time
+from typing import Any
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -29,12 +30,14 @@ from src.game_integration import (
 results: list[tuple[str, bool, str]] = []
 
 
-def check(name, passed, detail):
+def check(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     print(f"[{'PASS' if passed else 'FAIL'}] {name:<34} {detail}")
 
 
-def fake(state, command, now, sequence=1, **extra):
+def fake(
+    state: SharedState, command: str | None, now: float, sequence: int = 1, **extra: Any
+) -> None:
     """Publish a recognition snapshot exactly as the real worker would."""
     state.publish(
         sequence=sequence,
@@ -50,7 +53,7 @@ def fake(state, command, now, sequence=1, **extra):
     )
 
 
-def build():
+def build() -> tuple[SharedState, GestureController, Game]:
     state = SharedState()
     controller = GestureController(state)
     game = Game(headless=True)
@@ -59,7 +62,7 @@ def build():
     return state, controller, game
 
 
-def main():
+def main() -> int:
     step = 1.0 / 60.0
 
     # --- direction mapping ------------------------------------------------------------
@@ -342,7 +345,7 @@ def main():
         internally - and made shutdown raise TypeError. No mapping test can catch that.
         """
 
-        def run(self):
+        def run(self) -> None:
             try:
                 self.state.publish(status="ready", camera_ok=True)
                 while not self._stop_event.is_set():

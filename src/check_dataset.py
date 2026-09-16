@@ -54,29 +54,30 @@ MAX_ASPECT = 1.15  # hand crops are squared off, so w/h must stay close to 1
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
-GRID_PATH = os.path.join(PROJECT_ROOT, "dataset_sample_grid.jpg")
+QA_DIR = os.path.join(PROJECT_ROOT, "reports", "qa")  # generated sheets, gitignored
+GRID_PATH = os.path.join(QA_DIR, "dataset_sample_grid.jpg")
 
 GRID_SAMPLES = 10
 GRID_THUMB = 128
 GRID_SEED = 7
 
-UPDOWN_PATH = os.path.join(PROJECT_ROOT, "updown_orientation_grid.jpg")
+UPDOWN_PATH = os.path.join(QA_DIR, "updown_orientation_grid.jpg")
 UPDOWN_COLUMNS = 8  # per class, per row block
 UPDOWN_ROWS = 3  # so 24 samples of up and 24 of down
 
 results: list[tuple[str, bool, str]] = []
 
 
-def class_dir(label):
+def class_dir(label: str) -> str:
     return os.path.join(DATASET_DIR, label)
 
 
-def record(name, passed, detail):
+def record(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     print(f"[{'PASS' if passed else 'FAIL'}] {name:<22} {detail}")
 
 
-def scan():
+def scan() -> dict[str, dict[str, Any]]:
     """Read every image once, returning per-class stats."""
     stats = {}
     for label in CLASSES:
@@ -122,7 +123,7 @@ def scan():
     return stats
 
 
-def write_sample_grid(stats):
+def write_sample_grid(stats: dict[str, dict[str, Any]]) -> None:
     """Contact sheet: one row per class, GRID_SAMPLES random thumbnails each."""
     rng = random.Random(GRID_SEED)
     label_width = 110
@@ -171,6 +172,7 @@ def write_sample_grid(stats):
         rows.append(np.hstack([caption, strip]))
 
     grid = np.vstack(rows)
+    os.makedirs(QA_DIR, exist_ok=True)
     cv2.imwrite(GRID_PATH, grid)
     print(
         f"[NOTE] sample grid written to {os.path.relpath(GRID_PATH, PROJECT_ROOT)} "
@@ -178,7 +180,7 @@ def write_sample_grid(stats):
     )
 
 
-def write_updown_grid(stats):
+def write_updown_grid(stats: dict[str, dict[str, Any]]) -> None:
     """A larger, side-by-side sheet for the highest-risk pair: thumbs up vs thumbs down.
 
     `up` and `down` are the same hand rotated about 180 degrees, so a mis-cropped or
@@ -225,6 +227,7 @@ def write_updown_grid(stats):
             blocks.append(strip)
 
     sheet = np.vstack(blocks)
+    os.makedirs(QA_DIR, exist_ok=True)
     cv2.imwrite(UPDOWN_PATH, sheet)
     print(
         f"[NOTE] up/down orientation sheet written to "
@@ -232,7 +235,7 @@ def write_updown_grid(stats):
     )
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Check gesture dataset integrity.")
     parser.add_argument(
         "--dir", default="dataset", help="dataset folder to check, relative to the project root"
@@ -250,7 +253,7 @@ def main():
     # The --dir option rebinds the module paths exactly once, before anything reads them.
     global DATASET_DIR, GRID_PATH  # noqa: PLW0603
     DATASET_DIR = os.path.join(PROJECT_ROOT, args.dir)
-    GRID_PATH = os.path.join(PROJECT_ROOT, f"{os.path.basename(args.dir)}_sample_grid.jpg")
+    GRID_PATH = os.path.join(QA_DIR, f"{os.path.basename(args.dir)}_sample_grid.jpg")
 
     print("Dataset check - CNN-Based Gesture Controlled Gaming Application")
     print(f"dataset root: {DATASET_DIR}")

@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     report["comparison_with_p5_test"] = compare_with_p5(hits, total, rigor.load_predictions())
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(json.dumps(report, indent=1), encoding="utf-8")
+    REPORT_PATH.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
     write_predictions(
         entries,
         results["true"],

@@ -409,7 +409,7 @@ def write_report(
         "summary": summarise(results),
         "runs": results,
     }
-    path.write_text(json.dumps(report, indent=1), encoding="utf-8")
+    path.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
 
 
 def main(argv: list[str] | None = None) -> int:

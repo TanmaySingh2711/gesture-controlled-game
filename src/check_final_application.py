@@ -63,17 +63,19 @@ KEYBOARD_PROBE = (
 results: list[tuple[str, bool, str]] = []
 
 
-def check(name, passed, detail):
+def check(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     print(f"[{'PASS' if passed else 'FAIL'}] {name:<36} {detail}")
 
 
-def digest(path):
+def digest(path: str) -> str:
     with open(path, "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest().upper()
 
 
-def publish(state, command, now=None, sequence=1):
+def publish(
+    state: SharedState, command: str | None, now: float | None = None, sequence: int = 1
+) -> None:
     state.publish(
         sequence=sequence,
         timestamp=now if now is not None else time.perf_counter(),
@@ -87,7 +89,14 @@ def publish(state, command, now=None, sequence=1):
     )
 
 
-def build():
+def banner(game: Game) -> tuple[str, list[str]]:
+    lines = game.banner_lines()
+    if lines is None:
+        raise RuntimeError(f"no banner in state {game.state!r}")
+    return lines
+
+
+def build() -> tuple[SharedState, GestureController, Game]:
     """A game already in play, with a controller fed by hand-published snapshots."""
     state = SharedState()
     controller = GestureController(state)
@@ -97,7 +106,15 @@ def build():
     return state, controller, game
 
 
-def gesture_run(state, controller, game, command, frames, sequence=1, step=1.0 / 60.0):
+def gesture_run(
+    state: SharedState,
+    controller: GestureController,
+    game: Game,
+    command: str | None,
+    frames: int,
+    sequence: int = 1,
+    step: float = 1.0 / 60.0,
+) -> int:
     """Drive the game purely through the gesture path for N frames, as the real loop does."""
     now = time.perf_counter()
     for index in range(frames):
@@ -110,7 +127,7 @@ def gesture_run(state, controller, game, command, frames, sequence=1, step=1.0 /
     return sequence
 
 
-def main():
+def main() -> int:
     before_hash = digest(CHECKPOINT)
     before_mtime = os.path.getmtime(CHECKPOINT)
     before_size = os.path.getsize(CHECKPOINT)
@@ -171,7 +188,7 @@ def main():
     class IdleWorker(RecognitionWorker):
         """The real start/stop lifecycle, minus the camera and model, so no device is touched."""
 
-        def run(self):
+        def run(self) -> None:
             self._stop_event.wait()
 
     state = SharedState()
@@ -302,7 +319,7 @@ def main():
     game.update(1.0 / 60.0)
     for _ in range(120):
         game.update(1.0 / 60.0)
-    headline, details = game.banner_lines()
+    headline, details = banner(game)
     check(
         "Game Over ends the game",
         game.state == GAME_OVER
@@ -357,7 +374,7 @@ def main():
     game.maze.power_pellets = set()
     game.player.reset_to((22, 13), "left")
     gesture_run(state, controller, game, "left", 40)
-    cleared = game.state == ROUND_CLEAR and game.banner_lines()[0] == "ROUND 1 CLEARED!"
+    cleared = game.state == ROUND_CLEAR and banner(game)[0] == "ROUND 1 CLEARED!"
     for _ in range(150):  # run the round-clear pause out
         game.update(1.0 / 60.0)
     speeds_after = [g.base_speed for g in game.ghosts]
@@ -451,7 +468,7 @@ def main():
     played = [line for line in probe.stdout.splitlines() if line.startswith("SCORE")]
     check(
         "keyboard-only launch loads no CNN",
-        probe.returncode == 0 and loaded == ["LOADED []"] and played,
+        probe.returncode == 0 and loaded == ["LOADED []"] and bool(played),
         f"a fresh `--no-camera` process played 120 frames ({played[0].lower() if played else 'n/a'}) "
         "with torch, torchvision and cv2 never imported",
     )
@@ -482,7 +499,7 @@ def main():
     class LoopWorker(RecognitionWorker):
         """The real lifecycle with the camera and CNN removed, so shutdown is repeatable."""
 
-        def run(self):
+        def run(self) -> None:
             try:
                 self.state.publish(status="ready", camera_ok=True)
                 while not self._stop_event.is_set():

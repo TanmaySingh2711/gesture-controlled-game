@@ -70,19 +70,6 @@ RELEASE_DELAY: Final = {"chaser": 0.0, "ambusher": 2.0, "flanker": 6.0, "drifter
 
 RESPAWN_DELAY: Final = 1.2  # how long a returned ghost sits in the house before leaving
 
-Color = tuple[int, int, int]
-
-COLORS: Final[dict[str, Color]] = {
-    "chaser": (255, 82, 82),  # red
-    "ambusher": (255, 170, 215),  # pink
-    "flanker": (105, 220, 235),  # cyan
-    "drifter": (255, 178, 82),  # orange
-}
-
-FRIGHTENED_COLOR: Final[Color] = (60, 80, 225)
-FRIGHTENED_FLASH_COLOR: Final[Color] = (235, 235, 245)
-EYE_COLOR: Final[Color] = (235, 235, 245)
-
 DRIFTER_RETREAT_TILES: Final = 8
 AMBUSH_TILES: Final = 4
 FLANK_TILES: Final = 2
@@ -96,7 +83,6 @@ def tile_distance(a: Tile, b: Tile) -> int:
 class Ghost(Entity):
     def __init__(self, maze: Maze, role: str, speed_scale: float = 1.0, seed: int = 0) -> None:
         self.role = role
-        self.color: Color = COLORS[role]
         self.scatter_target: Tile = SCATTER_TARGETS[role]
         # A stable per-role offset. The first version used `hash(role)`, which Python
         # randomises per process for strings - so frightened ghosts wandered differently on
@@ -309,14 +295,6 @@ class Ghost(Entity):
         options = self.legal_directions()
         if options:
             self.direction = options[0]
-
-    # --- drawing state -------------------------------------------------------------------
-    def body_color(self) -> Color | None:
-        if self.state == EATEN:
-            return None  # eyes only
-        if self.state == FRIGHTENED:
-            return FRIGHTENED_FLASH_COLOR if self.frightened_flash else FRIGHTENED_COLOR
-        return self.color
 
 
 def make_ghosts(maze: Maze, seed: int = 0) -> list[Ghost]:

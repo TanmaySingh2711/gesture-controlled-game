@@ -1,7 +1,9 @@
 # Quality gates on every commit:  pip install pre-commit  &&  pre-commit install
 # Run everything by hand at any time with:  pre-commit run --all-files
 
-exclude: ^(archive|dataset|dataset_archive_endless_runner|dataset_external|game_archive_endless_runner|venv)/
+# Frozen records (model/, the split files) are excluded too: whitespace fixers must never
+# rewrite a byte of them.
+exclude: ^((archive|dataset|dataset_external|model|venv)/|(data_splits|class_mapping)\.json$)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -19,11 +19,14 @@ Usage:
 import argparse
 import os
 import sys
+import tempfile
 from collections import Counter
+from typing import Any
 
 import cv2
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from src.data_pipeline import (
     BATCH_SIZE,
@@ -47,8 +50,9 @@ from src.data_pipeline import (
 TRAIN_PER_CLASS, VAL_PER_CLASS, TEST_PER_CLASS = 400, 50, 50
 EXPECTED = {"train": 1600, "val": 200, "test": 200}
 REQUIRED_MAPPING = {"left": 0, "right": 1, "up": 2, "down": 3}
-GRID_PATH = os.path.join(PROJECT_ROOT, "augmentation_sample_grid.jpg")
-UPDOWN_GRID_PATH = os.path.join(PROJECT_ROOT, "augmentation_updown_grid.jpg")
+QA_DIR = os.path.join(PROJECT_ROOT, "reports", "qa")  # generated sheets, gitignored
+GRID_PATH = os.path.join(QA_DIR, "augmentation_sample_grid.jpg")
+UPDOWN_GRID_PATH = os.path.join(QA_DIR, "augmentation_updown_grid.jpg")
 
 # Any transform whose name contains one of these could invert or heavily rotate an image.
 BANNED_TRANSFORMS = ("verticalflip", "randomrotation", "randomperspective")
@@ -56,12 +60,12 @@ BANNED_TRANSFORMS = ("verticalflip", "randomrotation", "randomperspective")
 results: list[tuple[str, bool, str]] = []
 
 
-def record(name, passed, detail):
+def record(name: str, passed: bool, detail: str) -> None:
     results.append((name, passed, detail))
     print(f"[{'PASS' if passed else 'FAIL'}] {name:<26} {detail}")
 
 
-def flatten(transform):
+def flatten(transform: Any) -> list[Any]:
     """Every transform in a (possibly nested) Compose, depth first."""
     children = getattr(transform, "transforms", None)
     if children is None:
@@ -72,7 +76,7 @@ def flatten(transform):
     return found
 
 
-def check_mapping(split):
+def check_mapping(split: dict[str, Any]) -> None:
     """The frozen mapping must agree in three places: the code, and both JSON files."""
     record(
         "Mapping constant",
@@ -123,24 +127,34 @@ def check_mapping(split):
     )
 
 
-def check_regeneration():
-    """Seed 42 must reproduce the split exactly - verified, not assumed."""
+def check_regeneration() -> None:
+    """Seed 42 must reproduce the split exactly - verified, not assumed.
+
+    The rebuild goes to a temporary folder, so the committed split is never overwritten. Line
+    endings are normalised before comparing, because git may check the file out with CRLF.
+    """
     with open(SPLIT_PATH, "rb") as handle:
-        before = handle.read()
-    build_split(force=True)
-    with open(SPLIT_PATH, "rb") as handle:
-        after = handle.read()
-    identical = before == after
+        committed = handle.read().replace(b"\r\n", b"\n")
+    with tempfile.TemporaryDirectory() as folder:
+        rebuilt_path = os.path.join(folder, "data_splits.json")
+        build_split(
+            force=True,
+            split_path=rebuilt_path,
+            mapping_path=os.path.join(folder, "class_mapping.json"),
+        )
+        with open(rebuilt_path, "rb") as handle:
+            rebuilt = handle.read()
+    identical = committed == rebuilt
     record(
         "Split regeneration",
         identical,
-        f"rebuilding with seed 42 reproduced the file byte-for-byte ({len(after)} bytes)"
+        f"rebuilding with seed 42 reproduced the committed split exactly ({len(rebuilt)} bytes)"
         if identical
         else "regenerating the split produced a different file",
     )
 
 
-def check_transform_safety():
+def check_transform_safety() -> None:
     """No transform may be able to turn a thumbs-up into a thumbs-down."""
     train = flatten(train_transform())
     names = [type(t).__name__ for t in train]
@@ -192,7 +206,7 @@ def check_transform_safety():
     )
 
 
-def check_every_class(split):
+def check_every_class(split: dict[str, Any]) -> None:
     """One image of every class must survive both transforms with the right label."""
     detail, ok = [], True
     for name in CLASSES:
@@ -215,7 +229,7 @@ def check_every_class(split):
     )
 
 
-def check_loader_config(loaders, batch_size, workers):
+def check_loader_config(loaders: dict[str, DataLoader[Any]], batch_size: int, workers: int) -> None:
     train, val, test = loaders["train"], loaders["val"], loaders["test"]
     shuffles = (
         not isinstance(train.sampler, torch.utils.data.SequentialSampler),
@@ -232,7 +246,7 @@ def check_loader_config(loaders, batch_size, workers):
     )
 
 
-def check_split(split):
+def check_split(split: dict[str, Any]) -> None:
     counts = {name: len(items) for name, items in split["splits"].items()}
     record("Split sizes", counts == EXPECTED, f"{counts} (expected {EXPECTED})")
 
@@ -290,7 +304,7 @@ def check_split(split):
     )
 
 
-def check_batches(loaders, train_batches=3):
+def check_batches(loaders: dict[str, DataLoader[Any]], train_batches: int = 3) -> None:
     """Shapes, finiteness and label range across batches of each loader.
 
     Validation and test are swept in full: they are unshuffled and the split file is
@@ -348,7 +362,7 @@ def check_batches(loaders, train_batches=3):
         )
 
 
-def check_determinism(split):
+def check_determinism(split: dict[str, Any]) -> None:
     entries = split["splits"]["val"][:8]
     dataset = GestureDataset(entries, eval_transform())
     first = torch.stack([dataset[i][0] for i in range(len(entries))])
@@ -376,7 +390,7 @@ def check_determinism(split):
     )
 
 
-def check_cuda(loader):
+def check_cuda(loader: DataLoader[Any]) -> None:
     if not torch.cuda.is_available():
         record("CUDA transfer", False, "CUDA is not available")
         return
@@ -396,7 +410,7 @@ def check_cuda(loader):
     torch.cuda.empty_cache()
 
 
-def write_augmentation_grid(split, variants=6):
+def write_augmentation_grid(split: dict[str, Any], variants: int = 6) -> None:
     """One row per class: the original crop, then several augmented versions of it."""
     transform = train_transform()
     rows = []
@@ -436,6 +450,7 @@ def write_augmentation_grid(split, variants=6):
         rows.append(np.hstack([strip, *cells]))
 
     grid = np.vstack(rows)
+    os.makedirs(QA_DIR, exist_ok=True)
     cv2.imwrite(GRID_PATH, grid)
     print(
         f"[NOTE] augmentation grid written to "
@@ -443,7 +458,7 @@ def write_augmentation_grid(split, variants=6):
     )
 
 
-def write_updown_grid(split, rows_per_class=3, variants=7):
+def write_updown_grid(split: dict[str, Any], rows_per_class: int = 3, variants: int = 7) -> None:
     """A focused sheet: many augmented thumbs-up and thumbs-down, for orientation QA.
 
     This is the pair the augmentation could plausibly break, so it gets more samples and
@@ -490,6 +505,7 @@ def write_updown_grid(split, rows_per_class=3, variants=7):
             blocks.append(np.hstack(cells))
 
     sheet = np.vstack(blocks)
+    os.makedirs(QA_DIR, exist_ok=True)
     cv2.imwrite(UPDOWN_GRID_PATH, sheet)
     print(
         f"[NOTE] up/down augmentation sheet written to "
@@ -501,7 +517,7 @@ def write_updown_grid(split, rows_per_class=3, variants=7):
 SEED_FOR_GRID = 7
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Verify the gesture data pipeline.")
     parser.add_argument("--workers", type=int, default=NUM_WORKERS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)

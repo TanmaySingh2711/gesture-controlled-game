@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from game.engine import Game
 from game.entity import Entity
 from game.ghost import (
     CHASE,
@@ -12,8 +13,6 @@ from game.ghost import (
     EATEN_SPEED,
     ELROY_MAX_SPEED,
     FRIGHTENED,
-    FRIGHTENED_COLOR,
-    FRIGHTENED_FLASH_COLOR,
     FRIGHTENED_SPEED,
     GHOST_BASE_SPEED,
     GHOST_MAX_SPEED,
@@ -29,6 +28,7 @@ from game.ghost import (
 )
 from game.maze import GHOST_SPAWN, HOUSE_EXIT, PLAYER_SPAWN, SCATTER_TARGETS, TILE, Maze
 from game.player import PLAYER_SPEED
+from game.theme import THEMES, Theme
 
 FRAME = 1.0 / 60.0
 
@@ -202,16 +202,19 @@ def test_only_house_and_eaten_ghosts_use_the_door(maze: Maze, state: str, allowe
     assert ghost.can_enter_house() is allowed
 
 
-def test_body_colour_by_state(maze: Maze) -> None:
-    ghost = ghost_named(maze, "flanker")
+@pytest.mark.parametrize("theme", list(THEMES.values()), ids=list(THEMES))
+def test_body_colour_by_state_follows_the_theme(theme: Theme) -> None:
+    game = Game(headless=True)
+    game.set_theme(theme)
+    ghost = next(g for g in game.ghosts if g.role == "flanker")
     ghost.state = CHASE
-    assert ghost.body_color() == ghost.color
+    assert game.ghost_body_color(ghost) == theme.ghosts["flanker"]
     ghost.state = FRIGHTENED
-    assert ghost.body_color() == FRIGHTENED_COLOR
+    assert game.ghost_body_color(ghost) == theme.frightened
     ghost.frightened_flash = True
-    assert ghost.body_color() == FRIGHTENED_FLASH_COLOR
+    assert game.ghost_body_color(ghost) == theme.frightened_flash
     ghost.state = EATEN
-    assert ghost.body_color() is None
+    assert game.ghost_body_color(ghost) is None, "eaten ghosts are drawn as eyes only"
 
 
 # --- targeting ---------------------------------------------------------------------------

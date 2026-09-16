@@ -95,16 +95,12 @@ warn_return_any = true
 check_untyped_defs = true
 no_implicit_optional = true
 strict_equality = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 exclude = ["archive/", "venv/"]
 
 [[tool.mypy.overrides]]
-# The game package and the real-time application are fully typed.
-module = ["game.*", "src.game_integration", "src.play_gesture", "src.gesture_recognizer"]
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-
-[[tool.mypy.overrides]]
-module = ["cv2.*", "torchvision.*", "sklearn.*", "pyarrow.*", "matplotlib.*", "pygame.*", "psutil.*"]
+module = ["cv2.*", "torchvision.*", "sklearn.*", "matplotlib.*", "pygame.*", "psutil.*"]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------------------

@@ -38,8 +38,9 @@ import os
 import sys
 import time
 from collections import Counter, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 import cv2
 import numpy as np
@@ -47,6 +48,7 @@ import torch
 from PIL import Image
 
 from src.data_pipeline import CLASS_TO_INDEX, PROJECT_ROOT, eval_transform
+from src.game_integration import PredictionLike
 from src.gesture_recognizer import (
     DEFAULT_MIN_AGREEMENT,
     DEFAULT_THRESHOLD,
@@ -61,6 +63,7 @@ from src.gesture_recognizer import (
     ROI_Y1,
     ROI_Y2,
     DirectionRecognizer,
+    Prediction,
     label_of,
     open_camera,
 )
@@ -98,7 +101,14 @@ COLOR = {
 }
 
 
-def draw_overlay(frame, result, fps, recognizer, show_raw, banner=None):
+def draw_overlay(
+    frame: np.ndarray,
+    result: Prediction,
+    fps: float,
+    recognizer: DirectionRecognizer,
+    show_raw: bool,
+    banner: str | None = None,
+) -> np.ndarray:
     stable = result.stable_command
     colour = COLOR.get(stable, (220, 220, 220))
 
@@ -215,14 +225,32 @@ def draw_overlay(frame, result, fps, recognizer, show_raw, banner=None):
     return frame
 
 
+Check = Callable[[str, bool, str], None]
+
+
+class TransitionResult(PredictionLike, Protocol):
+    """A recognition result, plus whether its stable command just changed."""
+
+    @property
+    def stable_changed(self) -> bool: ...
+
+
+class SmoothingSettings(Protocol):
+    """The recognizer settings a trial record reports."""
+
+    threshold: float
+    window: int
+    min_agreement: int
+
+
 class FrameRate:
     """Rolling frame rate over the last `window` frames."""
 
-    def __init__(self, window=30):
+    def __init__(self, window: int = 30) -> None:
         self.times: deque[float] = deque(maxlen=window)
         self.previous = time.perf_counter()
 
-    def tick(self):
+    def tick(self) -> float:
         now = time.perf_counter()
         self.times.append(now - self.previous)
         self.previous = now
@@ -233,7 +261,7 @@ class FrameRate:
 KEY_ACTIONS = {ord("s"): "skip", ord(" "): "record", ord("r"): "reset", ord("d"): "debug"}
 
 
-def read_action(window):
+def read_action(window: str) -> str | None:
     """This frame's action: "quit", "skip", "record", "reset", "debug" or None.
 
     Closing the window counts as quitting, exactly like Q or ESC.
@@ -244,7 +272,7 @@ def read_action(window):
     return KEY_ACTIONS.get(key)
 
 
-def write_records(out_path, records):
+def write_records(out_path: str, records: list[dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(records[0]))
@@ -252,7 +280,7 @@ def write_records(out_path, records):
         writer.writerows(records)
 
 
-def preview(recognizer):
+def preview(recognizer: DirectionRecognizer) -> None:
     capture = open_camera()
     meter = FrameRate()
     show_raw = False
@@ -288,7 +316,7 @@ def preview(recognizer):
         )
 
 
-def benchmark(recognizer, frames, show):
+def benchmark(recognizer: DirectionRecognizer, frames: int, show: bool) -> dict[str, Any] | None:
     """Measure the whole live pipeline: capture, mirror, crop, preprocess, CNN, smooth, draw."""
     capture = open_camera()
     meter = FrameRate(window=frames)
@@ -342,7 +370,9 @@ def benchmark(recognizer, frames, show):
     }
 
 
-def trial_record(position, expected, result, recognizer):
+def trial_record(
+    position: int, expected: str, result: PredictionLike, recognizer: SmoothingSettings
+) -> dict[str, Any]:
     """One recorded trial. For the no-command categories the correct answer is NO COMMAND."""
     expected_command = None if expected in NO_COMMAND_CATEGORIES else expected
     correct = result.stable_command == expected_command
@@ -362,7 +392,9 @@ def trial_record(position, expected, result, recognizer):
     }
 
 
-def trials(recognizer, category_list, count, out_path):
+def trials(
+    recognizer: DirectionRecognizer, category_list: list[str], count: int, out_path: str
+) -> list[dict[str, Any]] | None:
     """Guided recorder. SPACE records the current stable command for the prompt.
 
     For the four directions the correct answer is that direction. For no_hand and idle_hand the
@@ -426,7 +458,7 @@ def trials(recognizer, category_list, count, out_path):
     return records
 
 
-def summarise(records, category_list):
+def summarise(records: list[dict[str, Any]], category_list: list[str]) -> None:
     correct = sum(1 for r in records if r["correct"] == "yes")
     print("-" * 72)
     print(f"overall: {correct}/{len(records)} ({correct / len(records) * 100:.1f}%)")
@@ -492,7 +524,7 @@ class TransitionTimer:
     spurious: list[str] = field(default_factory=list)
     done: bool = False
 
-    def observe(self, result: Any, now: float) -> None:
+    def observe(self, result: TransitionResult, now: float) -> None:
         self.frames += 1
         # The moment the hand first *looks* like the target to the CNN. Everything before this
         # is the human moving; everything after is the recognizer deciding. Only the second
@@ -506,7 +538,7 @@ class TransitionTimer:
             elif result.stable_command != self.source:
                 self.spurious.append(result.stable_command)
 
-    def record(self, now: float, recognizer: Any) -> dict[str, Any]:
+    def record(self, now: float, recognizer: SmoothingSettings) -> dict[str, Any]:
         elapsed = (now - self.started) * 1000.0
         if self.raw_seen is not None:
             lag_ms = (now - self.raw_seen) * 1000.0
@@ -529,7 +561,7 @@ class TransitionTimer:
         }
 
 
-def print_transition(record, position, total):
+def print_transition(record: dict[str, Any], position: int, total: int) -> None:
     mark = "OK " if not record["spurious_count"] else "SPUR"
     spurious = (
         f"  spurious: {record['spurious_commands'].split('|')}" if record["spurious_count"] else ""
@@ -541,7 +573,7 @@ def print_transition(record, position, total):
     )
 
 
-def summarise_transitions(records):
+def summarise_transitions(records: list[dict[str, Any]]) -> None:
     times = [r["ms_to_stable"] for r in records]
     lags = [r["recognizer_lag_ms"] for r in records if r["recognizer_lag_frames"]]
     spurious = [r for r in records if r["spurious_count"]]
@@ -566,7 +598,9 @@ def summarise_transitions(records):
         print(f"  which: {dict(tally)}")
 
 
-def transitions(recognizer, repeats, out_path):
+def transitions(
+    recognizer: DirectionRecognizer, repeats: int, out_path: str
+) -> list[dict[str, Any]] | None:
     """Transition stress test: press SPACE as you START moving to the target gesture.
 
     Measures how long the intended command takes to stabilise, and whether any *other* stable
@@ -636,7 +670,7 @@ def transitions(recognizer, repeats, out_path):
     return records
 
 
-def _selftest_model(recognizer, check):
+def _selftest_model(recognizer: DirectionRecognizer, check: Check) -> None:
     """Checkpoint identity, device, and preprocessing parity."""
     meta = recognizer.metadata
     check(
@@ -661,7 +695,10 @@ def _selftest_model(recognizer, check):
     # Preprocessing parity: the webcam path must build the same tensor as the evaluation path.
     sample = os.path.join(PROJECT_ROOT, "dataset", "left", "left_00003.jpg")
     bgr = cv2.imread(sample)
-    webcam_tensor = recognizer.preprocess(bgr).cpu()
+    if bgr is None:
+        check("preprocessing parity", False, f"could not read {sample}")
+        return
+    webcam_tensor = recognizer.preprocess(bgr.astype(np.uint8, copy=False)).cpu()
     with Image.open(sample) as image:
         dataset_tensor = eval_transform()(image.convert("RGB")).unsqueeze(0)
     identical = torch.equal(webcam_tensor, dataset_tensor)
@@ -671,7 +708,7 @@ def _selftest_model(recognizer, check):
     )
 
 
-def _selftest_smoothing(recognizer, check):
+def _selftest_smoothing(recognizer: DirectionRecognizer, check: Check) -> None:
     """The rolling-window semantics that stand between one bad frame and a wrong turn."""
     recognizer.reset()
     stable = [recognizer._smooth(d) for d in ["up", "up", None, "up", "up"]]
@@ -718,7 +755,7 @@ def _selftest_smoothing(recognizer, check):
     recognizer.reset()
 
 
-def _selftest_webcam(recognizer, check):
+def _selftest_webcam(recognizer: DirectionRecognizer, check: Check) -> None:
     """A real frame through the real pipeline: capture, mirror, ROI, inference."""
     capture = open_camera()
     try:
@@ -757,11 +794,11 @@ def _selftest_webcam(recognizer, check):
         recognizer.reset()
 
 
-def selftest(recognizer):
+def selftest(recognizer: DirectionRecognizer) -> bool:
     """Headless checks: metadata, device, preprocessing parity, smoothing, webcam."""
     results = []
 
-    def check(name, passed, detail):
+    def check(name: str, passed: bool, detail: str) -> None:
         results.append((name, passed))
         print(f"[{'PASS' if passed else 'FAIL'}] {name:<20} {detail}")
 
@@ -780,7 +817,7 @@ def selftest(recognizer):
     return True
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Real-time direction recognition demo.")
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)

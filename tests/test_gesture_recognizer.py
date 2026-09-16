@@ -37,7 +37,9 @@ from src.gesture_recognizer import (
 gpu = pytest.mark.gpu
 
 
-def voter(window: int = DEFAULT_WINDOW, min_agreement: int = DEFAULT_MIN_AGREEMENT):
+def voter(
+    window: int = DEFAULT_WINDOW, min_agreement: int = DEFAULT_MIN_AGREEMENT
+) -> DirectionRecognizer:
     """A recognizer with only its smoothing state - no model, no CUDA."""
     recognizer = object.__new__(DirectionRecognizer)
     recognizer.window = window

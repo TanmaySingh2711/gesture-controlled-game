@@ -42,7 +42,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PER_CLASS = TRAIN_PER_CLASS + VAL_PER_CLASS + TEST_PER_CLASS
 
 
-def colour_image(size: tuple[int, int] = (24, 24), colour: tuple[int, int, int] = (90, 140, 200)):
+def colour_image(
+    size: tuple[int, int] = (24, 24), colour: tuple[int, int, int] = (90, 140, 200)
+) -> Image.Image:
     return Image.new("RGB", size, colour)
 
 
@@ -69,7 +71,8 @@ def tiny_dataset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 # --- split -------------------------------------------------------------------------------
-def test_split_is_stratified_and_disjoint(tiny_dataset: Path) -> None:
+@pytest.mark.usefixtures("tiny_dataset")
+def test_split_is_stratified_and_disjoint() -> None:
     payload = build_split(force=True)
     splits = payload["splits"]
     assert payload["counts"] == {
@@ -110,7 +113,8 @@ def test_a_class_with_the_wrong_image_count_is_refused(tiny_dataset: Path) -> No
         build_split(force=True)
 
 
-def test_loading_a_missing_split_says_what_to_run(tiny_dataset: Path) -> None:
+@pytest.mark.usefixtures("tiny_dataset")
+def test_loading_a_missing_split_says_what_to_run() -> None:
     with pytest.raises(FileNotFoundError, match="build_split"):
         load_split()
 
@@ -174,7 +178,8 @@ def test_denormalize_undoes_normalisation() -> None:
 
 
 # --- dataset and loaders -----------------------------------------------------------------
-def test_dataset_reads_images_and_labels(tiny_dataset: Path) -> None:
+@pytest.mark.usefixtures("tiny_dataset")
+def test_dataset_reads_images_and_labels() -> None:
     entries = build_split(force=True)["splits"]["val"]
     dataset = GestureDataset(entries, eval_transform())
     image, label = dataset[len(dataset) - 1]
@@ -183,7 +188,8 @@ def test_dataset_reads_images_and_labels(tiny_dataset: Path) -> None:
     assert label == entries[-1]["label"]
 
 
-def test_datasets_use_augmentation_for_training_only(tiny_dataset: Path) -> None:
+@pytest.mark.usefixtures("tiny_dataset")
+def test_datasets_use_augmentation_for_training_only() -> None:
     train_set, val_set, test_set = get_datasets()
     assert len(train_set) == TRAIN_PER_CLASS * 4
     assert len(test_set) == TEST_PER_CLASS * 4
@@ -193,7 +199,8 @@ def test_datasets_use_augmentation_for_training_only(tiny_dataset: Path) -> None
         assert v2.RandomHorizontalFlip not in [type(t) for t in split.transform.transforms]
 
 
-def test_loaders_shuffle_training_only(tiny_dataset: Path) -> None:
+@pytest.mark.usefixtures("tiny_dataset")
+def test_loaders_shuffle_training_only() -> None:
     build_split(force=True)
     train, val, test = get_dataloaders(batch_size=8, num_workers=0, pin_memory=False)
     assert isinstance(train.sampler, RandomSampler)

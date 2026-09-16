@@ -69,11 +69,11 @@ GESTURE_HINTS = {
 DATASET_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dataset")
 
 
-def class_dir(label):
+def class_dir(label: str) -> str:
     return os.path.join(DATASET_DIR, label)
 
 
-def count_existing(label):
+def count_existing(label: str) -> int:
     """Number of images already collected for a class."""
     folder = class_dir(label)
     if not os.path.isdir(folder):
@@ -81,7 +81,7 @@ def count_existing(label):
     return len([f for f in os.listdir(folder) if f.lower().endswith(".jpg")])
 
 
-def next_free_path(label, index):
+def next_free_path(label: str, index: int) -> tuple[str, int]:
     """Build a unique path, skipping any filename that already exists (never overwrite)."""
     folder = class_dir(label)
     while True:
@@ -91,7 +91,7 @@ def next_free_path(label, index):
         index += 1
 
 
-def save_roi(label, roi, index):
+def save_roi(label: str, roi: Any, index: int) -> int | None:
     """Validate and write one ROI image. Returns the next index, or None if the save failed."""
     if roi is None or roi.size == 0:
         print("[warn] empty ROI, frame skipped")
@@ -107,7 +107,7 @@ def save_roi(label, roi, index):
     return index + 1
 
 
-def draw_overlay(display, label, counts, capturing):
+def draw_overlay(display: Any, label: str, counts: dict[str, int], capturing: bool) -> None:
     """Draw the ROI box, the current state and the on-screen instructions."""
     in_roi_color = (0, 220, 0) if capturing else (0, 200, 255)
     cv2.rectangle(display, (ROI_X1, ROI_Y1), (ROI_X2, ROI_Y2), in_roi_color, 2)
@@ -160,7 +160,7 @@ def draw_overlay(display, label, counts, capturing):
     )
 
 
-def open_camera():
+def open_camera() -> Any:
     capture = cv2.VideoCapture(0, cv2.CAP_DSHOW if os.name == "nt" else 0)
     if not capture.isOpened():
         raise RuntimeError("Could not open webcam device 0.")

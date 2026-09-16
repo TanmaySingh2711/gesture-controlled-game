@@ -279,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
 
     report = analyse(load_predictions(args.predictions))
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(json.dumps(report, indent=1), encoding="utf-8")
+    args.report.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
     plot_reliability(report["calibration"]["bins"], report["calibration"]["ece"], args.figure)
 
     low, high = report["accuracy_wilson_95"]

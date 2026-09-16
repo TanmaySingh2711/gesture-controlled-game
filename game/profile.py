@@ -67,7 +67,9 @@ class ProfileStore:
         temporary = self.path.with_suffix(".tmp")
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary.write_text(json.dumps(asdict(profile), indent=1), encoding="utf-8")
+            temporary.write_text(
+                json.dumps(asdict(profile), indent=1) + "\n", encoding="utf-8", newline="\n"
+            )
             temporary.replace(self.path)
         except OSError as error:
             log.warning("could not save profile to %s (%s)", self.path, error)

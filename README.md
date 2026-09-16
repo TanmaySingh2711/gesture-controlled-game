@@ -234,7 +234,7 @@ gesture-controlled-game/
 │   └── check_integration.py  check_ui.py  check_final_application.py
 ├── tests/                    # pytest suite
 ├── docs/                     # architecture, model and dataset cards, model study, manual test plan
-├── reports/                  # generated analyses
+├── reports/                  # generated analyses (QA image sheets go to reports/qa/, untracked)
 ├── model/                    # the frozen checkpoint and its training and evaluation records
 ├── dataset/                  # 500 images per class (images not tracked in git)
 ├── archive/                  # retired scripts, kept for the record

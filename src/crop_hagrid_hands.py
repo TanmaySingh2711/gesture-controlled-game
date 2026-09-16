@@ -88,19 +88,19 @@ CACHE_DIR = os.path.join(PROJECT_ROOT, ".hagrid_cache")
 class RangeFile(io.RawIOBase):
     """Seekable read-only file over HTTP range requests, with retries."""
 
-    def __init__(self, url, size):
+    def __init__(self, url: str, size: int) -> None:
         if not url.startswith("https://"):
             raise ValueError(f"refusing a non-https archive URL: {url!r}")
         self.url, self.size, self.pos = url, size, 0
         self.fetched, self.requests = 0, 0
 
-    def readable(self):
+    def readable(self) -> bool:
         return True
 
-    def seekable(self):
+    def seekable(self) -> bool:
         return True
 
-    def seek(self, offset, whence=0):
+    def seek(self, offset: int, whence: int = 0) -> int:
         if whence == 0:
             self.pos = offset
         elif whence == 1:
@@ -109,10 +109,10 @@ class RangeFile(io.RawIOBase):
             self.pos = self.size + offset
         return self.pos
 
-    def tell(self):
+    def tell(self) -> int:
         return self.pos
 
-    def read(self, n=-1):
+    def read(self, n: int | None = -1) -> bytes:
         if n is None or n < 0:
             n = self.size - self.pos
         if n == 0 or self.pos >= self.size:
@@ -123,7 +123,7 @@ class RangeFile(io.RawIOBase):
         for attempt in range(4):
             try:
                 with urllib.request.urlopen(request, timeout=300) as response:
-                    chunk = response.read()
+                    chunk: bytes = response.read()
                 break
             except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
                 last = exc
@@ -136,14 +136,14 @@ class RangeFile(io.RawIOBase):
         return chunk
 
 
-def open_archive():
+def open_archive() -> tuple[RangeFile, zipfile.ZipFile]:
     head = urllib.request.Request(ARCHIVE_URL, method="HEAD")
     size = int(urllib.request.urlopen(head, timeout=120).headers["Content-Length"])
     handle = RangeFile(ARCHIVE_URL, size)
     return handle, zipfile.ZipFile(handle)
 
 
-def load_annotations(zf, gestures):
+def load_annotations(zf: zipfile.ZipFile, gestures: list[str]) -> dict[str, dict[str, Any]]:
     """Official HaGRID train/val annotations, cached locally after the first run."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     annotations = {}
@@ -164,7 +164,7 @@ def load_annotations(zf, gestures):
     return annotations
 
 
-def largest_box(record, wanted_label):
+def largest_box(record: dict[str, Any], wanted_label: str) -> list[float] | None:
     """The biggest box carrying `wanted_label`, or None. Deterministic tie-break by index."""
     best, best_area = None, -1.0
     for box, label in zip(record["bboxes"], record["labels"], strict=True):
@@ -176,7 +176,9 @@ def largest_box(record, wanted_label):
     return best
 
 
-def build_candidates(annotations, selected):
+def build_candidates(
+    annotations: dict[str, dict[str, Any]], selected: list[str]
+) -> dict[str, list[tuple[str, str, list[float]]]]:
     """project class -> deterministic list of (gesture_folder, uuid, box)."""
     candidates: dict[str, list[tuple[str, str, list[float]]]] = {label: [] for label in selected}
     for project_class in selected:
@@ -193,7 +195,7 @@ def build_candidates(annotations, selected):
     return candidates
 
 
-def existing_hashes(selected):
+def existing_hashes(selected: list[str]) -> set[str]:
     """Hashes of images already in dataset/, so a new crop can never duplicate one.
 
     Classes being rebuilt are excluded, since their own folders are about to be replaced.
@@ -213,7 +215,7 @@ def existing_hashes(selected):
     return digests
 
 
-def square_crop(image, box):
+def square_crop(image: np.ndarray, box: list[float]) -> np.ndarray | None:
     """Pad the box, square it off, clamp to the image. Returns the crop or None.
 
     Known quirk, kept deliberately: `left`/`top` and `side` are rounded separately, so when the
@@ -262,7 +264,14 @@ class CropOutcome(NamedTuple):
     digest: str = ""
 
 
-def crop_member(zf, members, gesture, uuid, box, seen_hashes):
+def crop_member(
+    zf: zipfile.ZipFile,
+    members: set[str],
+    gesture: str,
+    uuid: str,
+    box: list[float],
+    seen_hashes: set[str],
+) -> CropOutcome:
     """Fetch, decode, crop and encode one HaGRID image exactly as the dataset was built."""
     member = f"{ROOT}/hagrid_500k/train_val_{gesture}/{uuid}.jpg"
     if member not in members:
@@ -303,7 +312,12 @@ class CropRun:
     sizes: dict[str, list[int]] = field(default_factory=dict)
 
 
-def crop_class(run, label, order, output_dir=CROPPED_DIR):
+def crop_class(
+    run: CropRun,
+    label: str,
+    order: list[tuple[str, str, list[float]]],
+    output_dir: str = CROPPED_DIR,
+) -> None:
     """Walk one class's candidates in order until `run.target` crops are written."""
     run.counts[label] = 0
     run.skipped[label] = dict.fromkeys(SKIP_REASONS, 0)
@@ -315,7 +329,7 @@ def crop_class(run, label, order, output_dir=CROPPED_DIR):
             run.skipped[label]["reused"] += 1
             continue
         outcome = crop_member(run.zf, run.members, gesture, uuid, box, run.seen_hashes)
-        if outcome.status != "ok":
+        if outcome.status != "ok" or outcome.data is None:
             run.skipped[label][outcome.status] += 1
             continue
 
@@ -341,7 +355,9 @@ def crop_class(run, label, order, output_dir=CROPPED_DIR):
     )
 
 
-def seeded_order(candidates, selected, seed=SEED):
+def seeded_order(
+    candidates: dict[str, list[tuple[str, str, list[float]]]], selected: list[str], seed: int = SEED
+) -> dict[str, list[tuple[str, str, list[float]]]]:
     """Each class's candidates in the deterministic order they are walked in.
 
     One random stream is shared across the classes in `selected`, so a class's order depends on
@@ -356,7 +372,7 @@ def seeded_order(candidates, selected, seed=SEED):
     return order
 
 
-def parse_arguments(argv=None):
+def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Crop HaGRID samples to annotated hand regions.")
     parser.add_argument("--per-class", type=int, default=DEFAULT_PER_CLASS)
     parser.add_argument(
@@ -378,7 +394,7 @@ def parse_arguments(argv=None):
     return parser.parse_args(argv)
 
 
-def print_plan(selected, target):
+def print_plan(selected: list[str], target: int) -> None:
     print("HaGRID hand-region cropping")
     print(f"source  : {ARCHIVE_URL.rsplit('/', 1)[-1]} (read over HTTP range requests)")
     print("mapping : " + ", ".join(f"{GESTURE_FOR[c]} -> {c}" for c in selected))
@@ -389,7 +405,7 @@ def print_plan(selected, target):
     print("-" * 78)
 
 
-def clear_output(selected, output_dir=CROPPED_DIR):
+def clear_output(selected: list[str], output_dir: str = CROPPED_DIR) -> None:
     for label in selected:
         folder = os.path.join(output_dir, label)
         os.makedirs(folder, exist_ok=True)
@@ -398,7 +414,7 @@ def clear_output(selected, output_dir=CROPPED_DIR):
                 os.remove(os.path.join(folder, name))
 
 
-def print_summary(run, selected, handle):
+def print_summary(run: CropRun, selected: list[str], handle: RangeFile) -> None:
     print("-" * 78)
     print(f"{'class':<10}{'source':<12}{'images':>8}   skipped")
     for label in selected:
@@ -408,7 +424,7 @@ def print_summary(run, selected, handle):
     print(f"transferred {handle.fetched / 1e6:.0f} MB in {handle.requests} range requests")
 
 
-def drop_annotation_cache(selected):
+def drop_annotation_cache(selected: list[str]) -> None:
     for gesture in (GESTURE_FOR[label] for label in selected):
         cached = os.path.join(CACHE_DIR, f"ann_{gesture}.json")
         if os.path.exists(cached):
@@ -417,7 +433,7 @@ def drop_annotation_cache(selected):
         os.rmdir(CACHE_DIR)
 
 
-def promote(selected):
+def promote(selected: list[str]) -> None:
     print("\npromoting dataset_cropped/ to dataset/ ...")
     for label in selected:
         destination = os.path.join(DATASET_DIR, label)
@@ -433,7 +449,7 @@ def promote(selected):
     print("dataset/ now holds the hand-region crops; dataset_cropped/ removed")
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv)
     target = args.per_class
     selected = [label for label in CLASSES if label in args.classes]

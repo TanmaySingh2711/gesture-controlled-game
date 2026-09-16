@@ -44,14 +44,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 @pytest.fixture
-def playing_game() -> Iterator[Game]:
+def playing_game() -> Game:
     """A headless game already past its READY pause, ready to be driven frame by frame."""
     from game.engine import PLAYING, Game
 
     instance = Game(headless=True)
     instance.state = PLAYING
     instance.state_timer = 0.0
-    yield instance
+    return instance
 
 
 @pytest.fixture(scope="session", autouse=True)

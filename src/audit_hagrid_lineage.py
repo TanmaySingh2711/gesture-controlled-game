@@ -98,7 +98,7 @@ def load_digest_cache() -> dict[str, str | None]:
 def save_digest_cache(cache: dict[str, str | None]) -> None:
     DIGEST_CACHE.parent.mkdir(parents=True, exist_ok=True)
     temporary = DIGEST_CACHE.with_suffix(".tmp")
-    temporary.write_text(json.dumps(cache), encoding="utf-8")
+    temporary.write_text(json.dumps(cache) + "\n", encoding="utf-8", newline="\n")
     temporary.replace(DIGEST_CACHE)
 
 
@@ -326,7 +326,9 @@ def build_external(
         print(
             f"  external {label:<6} done {count}/{per_class} from {len(taken)} people", flush=True
         )
-    (EXTERNAL_DIR / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    (EXTERNAL_DIR / "manifest.json").write_text(
+        json.dumps(manifest, indent=1) + "\n", encoding="utf-8", newline="\n"
+    )
     return manifest
 
 
@@ -377,14 +379,16 @@ def main() -> int:
                 "files": dict(sorted(files.items())),
             },
             indent=1,
-        ),
+        )
+        + "\n",
         encoding="utf-8",
+        newline="\n",
     )
 
     report = leakage_report(files, load_splits())
     report["lineage_matched"] = f"{len(files)}/{total}"
     (REPORTS_DIR / "subject_leakage.json").write_text(
-        json.dumps(report, indent=1), encoding="utf-8"
+        json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n"
     )
     print("\nsubject leakage")
     print(json.dumps(report, indent=1))

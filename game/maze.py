@@ -157,12 +157,6 @@ class Maze:
             return True
         return self.walls[row][column]
 
-    def is_door(self, row: int, column: int) -> bool:
-        return self.in_bounds(row, column) and self.doors[row][column]
-
-    def is_house(self, row: int, column: int) -> bool:
-        return self.in_bounds(row, column) and self.house[row][column]
-
     def is_walkable(
         self, row: int, column: int, *, doors: bool = False, house: bool = False
     ) -> bool:

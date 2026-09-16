@@ -13,6 +13,7 @@ Usage:
 
 import os
 import sys
+from typing import Any
 
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
@@ -28,7 +29,7 @@ def record(name: str, passed: bool, detail: str) -> None:
     print(f"[{status}] {name:<18} {detail}")
 
 
-def check_python():
+def check_python() -> None:
     v = sys.version_info
     version = f"{v.major}.{v.minor}.{v.micro}"
     ok = MIN_PYTHON <= (v.major, v.minor) <= MAX_PYTHON
@@ -40,7 +41,7 @@ def check_python():
     record("Python", ok, detail)
 
 
-def check_import(name, module_name, version_attr="__version__"):
+def check_import(name: str, module_name: str, version_attr: str = "__version__") -> Any:
     try:
         module = __import__(module_name)
         version = getattr(module, version_attr, "unknown")
@@ -51,7 +52,7 @@ def check_import(name, module_name, version_attr="__version__"):
         return None
 
 
-def check_torch_and_cuda():
+def check_torch_and_cuda() -> None:
     """Import PyTorch, then verify CUDA is present, allocatable and actually computes."""
     torch = check_import("PyTorch", "torch")
     check_import("torchvision", "torchvision")
@@ -112,7 +113,7 @@ def check_torch_and_cuda():
         record("CUDA computation", False, f"GPU computation failed: {exc}")
 
 
-def check_pygame():
+def check_pygame() -> None:
     pygame = check_import("Pygame", "pygame")
     if pygame is None:
         return
@@ -124,7 +125,7 @@ def check_pygame():
         record("Pygame init", False, f"initialization failed: {exc}")
 
 
-def check_webcam():
+def check_webcam() -> None:
     try:
         import cv2
     except Exception:
@@ -146,7 +147,7 @@ def check_webcam():
         capture.release()
 
 
-def main():
+def main() -> int:
     print("Environment check - CNN-Based Gesture Controlled Gaming Application")
     print("-" * 74)
 

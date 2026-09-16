@@ -31,10 +31,12 @@ import os
 import random
 import sys
 import time
+from collections.abc import Sized
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import matplotlib
+from torch.utils.data import DataLoader
 
 matplotlib.use("Agg")
 
@@ -80,12 +82,12 @@ PATIENCE = 3  # early stopping during stage 2
 UNFREEZE_FROM = 14  # features[14:] -> the last inverted-residual blocks + conv head
 
 
-def require_cuda():
+def require_cuda() -> None:
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU is required for CNN training.")
 
 
-def set_seed(seed=SEED):
+def set_seed(seed: int = SEED) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -95,35 +97,42 @@ def set_seed(seed=SEED):
     torch.backends.cudnn.benchmark = True
 
 
-def build_model():
+def build_model() -> nn.Module:
     """MobileNetV2 with ImageNet weights and a fresh 4-class head."""
     weights = MobileNet_V2_Weights.IMAGENET1K_V1
     model = mobilenet_v2(weights=weights)
     in_features = model.classifier[1].in_features
     # Output order is the frozen project mapping: 0=left, 1=right, 2=up, 3=down.
     model.classifier[1] = nn.Linear(in_features, NUM_CLASSES)
-    return model
+    return cast(nn.Module, model)
 
 
-def count_parameters(model):
+def count_parameters(model: nn.Module) -> tuple[int, int, int]:
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     return trainable, total - trainable, total
 
 
-def freeze_features(model):
-    for parameter in model.features.parameters():
+def freeze_features(model: nn.Module) -> None:
+    for parameter in cast(nn.Sequential, model.features).parameters():
         parameter.requires_grad = False
 
 
-def unfreeze_last_blocks(model, from_index=UNFREEZE_FROM):
-    for index, block in enumerate(model.features):
+def unfreeze_last_blocks(model: nn.Module, from_index: int = UNFREEZE_FROM) -> None:
+    for index, block in enumerate(cast(nn.Sequential, model.features)):
         if index >= from_index:
             for parameter in block.parameters():
                 parameter.requires_grad = True
 
 
-def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None):
+def run_epoch(
+    model: nn.Module,
+    loader: DataLoader[Any],
+    criterion: nn.Module,
+    device: torch.device,
+    optimizer: torch.optim.Optimizer | None = None,
+    scaler: torch.amp.GradScaler | None = None,
+) -> tuple[float, float]:
     """One pass over a loader. Training when an optimizer is given, else evaluation."""
     training = optimizer is not None
     model.train(training)
@@ -135,14 +144,16 @@ def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None):
             images = batch_images.to(device, non_blocking=True)
             labels = batch_labels.to(device, non_blocking=True)
 
-            if training:
+            if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
 
             with torch.amp.autocast("cuda", dtype=torch.float16):
                 outputs = model(images)
                 loss = criterion(outputs, labels)
 
-            if training:
+            if optimizer is not None:
+                if scaler is None:
+                    raise ValueError("training needs a GradScaler for float16 autocast")
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
@@ -155,7 +166,9 @@ def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None):
     return total_loss / seen, correct / seen
 
 
-def save_checkpoint(model, stage, epoch, val_acc, val_loss, batch_size):
+def save_checkpoint(
+    model: nn.Module, stage: str, epoch: int, val_acc: float, val_loss: float, batch_size: int
+) -> None:
     os.makedirs(MODEL_DIR, exist_ok=True)
     torch.save(
         {
@@ -184,7 +197,7 @@ def save_checkpoint(model, stage, epoch, val_acc, val_loss, batch_size):
     )
 
 
-def file_sha256(path):
+def file_sha256(path: str | os.PathLike[str]) -> str:
     """Hex SHA-256 of a file, read in 1 MB chunks."""
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -194,8 +207,11 @@ def file_sha256(path):
 
 
 def load_direction_checkpoint(
-    path=CHECKPOINT_PATH, device=None, *, expected_sha256=FROZEN_CHECKPOINT_SHA256
-):
+    path: str = CHECKPOINT_PATH,
+    device: torch.device | None = None,
+    *,
+    expected_sha256: str | None = FROZEN_CHECKPOINT_SHA256,
+) -> tuple[nn.Module, dict[str, Any]]:
     """Load the directional model through three independent guards.
 
     1. **Integrity.** The file's SHA-256 must equal `expected_sha256` (the frozen checkpoint by
@@ -257,7 +273,7 @@ class StageContext:
     batch_size: int
 
 
-def _print_environment(device, batch_size):
+def _print_environment(device: torch.device, batch_size: int) -> None:
     print(f"PyTorch        : {torch.__version__}")
     print(f"CUDA runtime   : {torch.version.cuda}")
     print(f"Device         : {torch.cuda.get_device_name(0)} ({device})")
@@ -267,7 +283,7 @@ def _print_environment(device, batch_size):
     print("-" * 78)
 
 
-def _run_stage(context, run, stage, epochs, lr):
+def _run_stage(context: StageContext, run: TrainingRun, stage: str, epochs: int, lr: float) -> None:
     """One stage of the two-stage recipe, selecting on validation loss as it goes."""
     model = context.model
     if stage == "stage1_head":
@@ -340,7 +356,13 @@ def _run_stage(context, run, stage, epochs, lr):
             break
 
 
-def _write_history(run, batch_size, breakdown, total_time, peak_mb):
+def _write_history(
+    run: TrainingRun,
+    batch_size: int,
+    breakdown: dict[str, Any],
+    total_time: float,
+    peak_mb: float,
+) -> None:
     os.makedirs(MODEL_DIR, exist_ok=True)
     with open(HISTORY_PATH, "w", encoding="utf-8") as handle:
         json.dump(
@@ -383,7 +405,7 @@ def _write_history(run, batch_size, breakdown, total_time, peak_mb):
         )
 
 
-def train(batch_size):
+def train(batch_size: int) -> tuple[dict[str, Any], int]:
     """The P4 two-stage transfer-learning run. The test split is never loaded."""
     device = torch.device("cuda")
     set_seed()
@@ -393,8 +415,8 @@ def train(batch_size):
     # cannot influence anything.
     train_loader, val_loader, _ = get_dataloaders(batch_size=batch_size)
     print(
-        f"train batches {len(train_loader)} ({len(train_loader.dataset)} images) | "
-        f"val batches {len(val_loader)} ({len(val_loader.dataset)} images)"
+        f"train batches {len(train_loader)} ({len(cast(Sized, train_loader.dataset))} images) | "
+        f"val batches {len(val_loader)} ({len(cast(Sized, val_loader.dataset))} images)"
     )
 
     scaler = torch.amp.GradScaler("cuda")
@@ -446,7 +468,7 @@ def train(batch_size):
     return run.best, batch_size
 
 
-def validation_breakdown(model, loader, device):
+def validation_breakdown(model: nn.Module, loader: DataLoader[Any], device: torch.device) -> Any:
     """Per-class validation accuracy and the full 4x4 validation confusion counts.
 
     Validation only - the test split is not touched in P4. The point is to catch a class
@@ -463,7 +485,7 @@ def validation_breakdown(model, loader, device):
     return confusion
 
 
-def print_validation_breakdown(confusion):
+def print_validation_breakdown(confusion: Any) -> dict[str, Any]:
     total = int(confusion.sum())
     correct = int(np.trace(confusion))
     print("-" * 78)
@@ -497,7 +519,7 @@ def print_validation_breakdown(confusion):
     }
 
 
-def plot_curves(history, best):
+def plot_curves(history: list[dict[str, Any]], best: dict[str, Any]) -> None:
     """Loss and accuracy over epochs, train and validation only - no test metrics."""
     steps = list(range(1, len(history) + 1))
     boundary = sum(1 for row in history if row["stage"] == "stage1_head")
@@ -548,7 +570,7 @@ def plot_curves(history, best):
     print(f"curves     {os.path.relpath(CURVES_PATH, PROJECT_ROOT)}")
 
 
-def verify_checkpoint(batch_size):
+def verify_checkpoint(batch_size: int) -> bool:
     """Rebuild the architecture from scratch, load the checkpoint, run one val batch."""
     print("-" * 78)
     print("checkpoint verification")
@@ -600,7 +622,7 @@ def verify_checkpoint(batch_size):
     return shape_ok and finite and on_cuda and ok
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Train the gesture CNN on CUDA.")
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     args = parser.parse_args()
