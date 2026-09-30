@@ -13,7 +13,7 @@ frozen for the Pac-Man direction: fist / palm / like / dislike.
 
 Collects raw ROI images for the four gesture classes: left, right, up, down.
 
-Mirror convention (frozen in PROJECT_SPEC.md section 7):
+Mirror convention (frozen in docs/PROJECT_SPEC.md section 7):
     Every frame is horizontally flipped immediately after capture, and every label refers to
     what the user sees in the flipped preview. The gesture the user sees is the label saved.
     The same flip and the same ROI are used later during real-time gameplay, so the model

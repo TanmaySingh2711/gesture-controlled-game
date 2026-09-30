@@ -17,7 +17,8 @@ Recording sessions with several people and rooms:
     python -m src.live_report                            combine every session into one report
 
 Recordings go to reports/live_sessions/, one file per session, named after the participant, the
-condition and the time. The P6 records in model/ are never written unless --out names them.
+condition and the time. The P6 records in reports/p6_live/ are never written unless --out
+names them.
 
 Trial categories include two that are not CNN classes:
 
@@ -77,11 +78,11 @@ from src.gesture_recognizer import (
 )
 
 TRIALS_PER_CLASS = 20
-MODEL_DIR = os.path.join(PROJECT_ROOT, "model")
 # The frozen P6 records. Kept for reference; new sessions never default to them.
-TRIALS_CSV = os.path.join(MODEL_DIR, "live_direction_test_baseline.csv")
-IDLE_CSV = os.path.join(MODEL_DIR, "live_direction_idle_baseline.csv")
-TRANSITIONS_CSV = os.path.join(MODEL_DIR, "live_direction_transitions.csv")
+P6_DIR = os.path.join(PROJECT_ROOT, "reports", "p6_live")
+TRIALS_CSV = os.path.join(P6_DIR, "live_direction_test_baseline.csv")
+IDLE_CSV = os.path.join(P6_DIR, "live_direction_idle_baseline.csv")
+TRANSITIONS_CSV = os.path.join(P6_DIR, "live_direction_transitions.csv")
 SESSIONS_DIR = os.path.join(PROJECT_ROOT, "reports", "live_sessions")
 
 # Categories whose correct outcome is "no command issued" rather than a direction.

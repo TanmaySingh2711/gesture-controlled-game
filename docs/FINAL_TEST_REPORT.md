@@ -5,6 +5,10 @@ Run date: 2026-09-13 · Windows 11 · Python 3.12.10 · PyTorch 2.14.0 + CUDA 13
 
 **Status: PASSED — automated, structured and manual acceptance testing all passed. Project COMPLETE.**
 
+> File paths below are as they were on the run date. Since then the split files moved into
+> `dataset/`, the P5 results from `model/` into `reports/p5_evaluation/`, and this report into
+> `docs/`; every moved file is byte-identical. See [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## 1. Application under test

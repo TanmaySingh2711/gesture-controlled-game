@@ -10,7 +10,7 @@ Key decisions (frozen in P3, carried over from the earlier pipeline except for t
   cheaper than 224px on a 4 GB GPU, and is a valid MobileNetV2 input size.
 * The images in `dataset/` are never modified or duplicated. Resizing and augmentation
   happen at run time, per batch.
-* Split is 80/10/10, stratified per class, seed 42, persisted to `data_splits.json`
+* Split is 80/10/10, stratified per class, seed 42, persisted to `dataset/data_splits.json`
   so every future run sees exactly the same train/val/test membership.
 * Class indices are pinned explicitly (left=0, right=1, up=2, down=3) rather than
   inherited from alphabetical folder order.
@@ -34,7 +34,7 @@ Real-time webcam inference MUST use exactly the evaluation preprocessing below, 
 `inference_transform()`. Any divergence silently degrades accuracy:
 
     webcam frame
-      -> cv2.flip(frame, 1)                  (mirror convention, PROJECT_SPEC.md section 7)
+      -> cv2.flip(frame, 1)                  (mirror convention, docs/PROJECT_SPEC.md section 7)
       -> crop the fixed 300x300 ROI          (x 300-600, y 90-390 of the 640x480 frame)
       -> BGR to RGB                          (OpenCV gives BGR, the model was trained on RGB)
       -> resize to 160x160
@@ -77,8 +77,8 @@ PIN_MEMORY = True  # batches are copied to CUDA during training
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
-SPLIT_PATH = os.path.join(PROJECT_ROOT, "data_splits.json")
-MAPPING_PATH = os.path.join(PROJECT_ROOT, "class_mapping.json")
+SPLIT_PATH = os.path.join(DATASET_DIR, "data_splits.json")
+MAPPING_PATH = os.path.join(DATASET_DIR, "class_mapping.json")
 
 
 # --- split ------------------------------------------------------------------------------

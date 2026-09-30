@@ -15,7 +15,7 @@ what makes them behave differently is only how each computes that target:
 
 This reproduces the *personalities* of the arcade ghosts without reproducing the arcade's
 exact target arithmetic - in particular the original's up-direction overflow bug is not
-recreated, which is a deliberate simplification recorded in PROJECT_SPEC.md.
+recreated, which is a deliberate simplification recorded in docs/PROJECT_SPEC.md.
 
 States
 ------

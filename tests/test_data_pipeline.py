@@ -138,7 +138,7 @@ def test_committed_split_is_reproduced_from_the_real_dataset(
     monkeypatch.setattr(data_pipeline, "MAPPING_PATH", str(tmp_path / "class_mapping.json"))
     build_split(force=True)
     for name in ("data_splits.json", "class_mapping.json"):
-        committed = (ROOT / name).read_bytes().replace(b"\r\n", b"\n")
+        committed = (ROOT / "dataset" / name).read_bytes().replace(b"\r\n", b"\n")
         rebuilt = (tmp_path / name).read_bytes().replace(b"\r\n", b"\n")
         assert rebuilt == committed, f"{name} no longer matches a fresh rebuild"
 

@@ -1,0 +1,26 @@
+# CNN-Based Gesture Controlled Gaming Application - machines WITHOUT an NVIDIA GPU
+# Python 3.12, 64-bit
+#
+# The same pinned versions as cuda.txt, but with the CPU build of PyTorch. The game and gesture
+# control both run on it: the recognizer uses the CPU automatically when there is no GPU and
+# needs about 12-14 ms per frame, well inside the webcam's 33 ms frame interval.
+#
+#     pip install -r requirements/cpu.txt
+#
+# `python install.py` picks this file or cuda.txt for you. Retraining the model is the only task
+# that still needs cuda.txt and an NVIDIA GPU.
+
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
+# Deep learning (CPU build)
+torch==2.14.0
+torchvision==0.29.0
+
+# Computer vision, game, and supporting libraries
+opencv-python==5.0.0.93
+pygame==2.6.1
+numpy==2.5.3
+matplotlib==3.11.2
+scikit-learn==1.9.1
+pillow==12.3.0

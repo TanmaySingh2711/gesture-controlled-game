@@ -8,12 +8,12 @@ version = "1.0.0"
 description = "A Pac-Man-style maze game controlled by hand gestures recognised in real time by a MobileNetV2 CNN."
 readme = "README.md"
 requires-python = ">=3.12"
-# Runtime dependencies live in requirements.txt, because PyTorch must come from the PyTorch
+# Runtime dependencies live in requirements/cuda.txt, because PyTorch must come from the PyTorch
 # CUDA index rather than PyPI. They are deliberately not duplicated here, so there is exactly
 # one place that pins them. Install with:
 #
-#     pip install -r requirements.txt
-#     pip install -r requirements-dev.txt
+#     pip install -r requirements/cuda.txt
+#     pip install -r requirements/dev.txt
 #     pip install -e . --no-deps
 dependencies = []
 
@@ -30,7 +30,9 @@ packages = ["game", "src"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["archive", "venv"]
+extend-exclude = ["venv", ".cache"]
+# Every tool's cache lives under .cache/, so nothing but source sits in the project root.
+cache-dir = ".cache/ruff"
 
 [tool.ruff.lint]
 select = [
@@ -100,7 +102,8 @@ no_implicit_optional = true
 strict_equality = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-exclude = ["archive/", "venv/"]
+exclude = ["venv/", ".cache/"]
+cache_dir = ".cache/mypy"
 
 [[tool.mypy.overrides]]
 module = ["cv2.*", "torchvision.*", "sklearn.*", "matplotlib.*", "pygame.*", "psutil.*"]
@@ -112,6 +115,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+cache_dir = ".cache/pytest"
 markers = [
     "gpu: needs the CUDA model (skipped automatically when CUDA is unavailable)",
     "webcam: needs a physical webcam (skipped unless GESTURE_WEBCAM_TESTS=1)",
@@ -124,6 +128,13 @@ branch = true
 # The self-test scripts must run in a fresh interpreter (each asserts torch and cv2 were never
 # imported), so tests launch them as subprocesses; this makes their coverage count too.
 patch = ["subprocess"]
+data_file = ".cache/coverage/.coverage"
+
+[tool.coverage.xml]
+output = ".cache/coverage/coverage.xml"
+
+[tool.coverage.html]
+directory = ".cache/coverage/html"
 
 [tool.coverage.report]
 show_missing = true

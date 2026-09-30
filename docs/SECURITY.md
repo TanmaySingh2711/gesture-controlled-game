@@ -16,7 +16,7 @@ records the threat model and the controls in place for each.
 | HaGRID dataset download | A non-HTTPS or redirected URL feeds unexpected content into the dataset | Download URLs are module constants validated as `https://` before any request; downloaded images are decoded and size-checked, and never executed |
 | `dataset/` images | A bug or tool silently rewrites training images, invalidating every result built on them (this happened once during testing: see `CHANGELOG.md`) | `tests/test_evaluate_model.py` hashes every dataset image before and after running the evaluation pipeline, and fails if any byte changed. `src/audit_hagrid_lineage.py` independently re-derives each image byte for byte from HaGRID. Damaged images are restored only when exactly one source is proven by that replay |
 | Webcam frames | Malformed frames crash the worker | Empty reads trigger bounded reconnection; any worker exception is reported once as `CAMERA ERROR` and the game keeps running on the keyboard |
-| Python dependencies | Known-vulnerable packages | Versions are pinned in `requirements.txt` and audited with `pip-audit` (CI runs it on every push) |
+| Python dependencies | Known-vulnerable packages | Versions are pinned in `requirements/cuda.txt` and audited with `pip-audit` (CI runs it on every push) |
 
 ## Verifying the model file yourself
 
@@ -33,9 +33,9 @@ two moving together.
 ## Dependency audit
 
 `pip-audit` reported **no known vulnerabilities** in the installed environment. The CUDA builds
-of `torch` and `torchvision` (`requirements.txt`) and their CPU builds (`requirements-cpu.txt`)
+of `torch` and `torchvision` (`requirements/cuda.txt`) and their CPU builds (`requirements/cpu.txt`)
 come from the PyTorch index rather than PyPI, so `pip-audit` cannot look them up. That index also
-supplies PyTorch's own dependencies, including an old `setuptools`; `requirements-dev.txt` pins a
+supplies PyTorch's own dependencies, including an old `setuptools`; `requirements/dev.txt` pins a
 patched one from PyPI. As a partial check, the same version numbers were audited against the PyPI
 advisory database, also with no known vulnerabilities:
 

@@ -10,7 +10,7 @@ The 2,000 hand images the direction model was trained, validated and tested on.
 | Classes | `left` (fist), `right` (open palm), `up` (thumbs up), `down` (thumbs down) |
 | Source | [HaGRID](https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p), the 500k-image 384p sample (Kapitanov et al.) |
 | Licence | CC-BY-SA-4.0, inherited from HaGRID |
-| Split | 1,600 train / 200 validation / 200 test, stratified per class, seed 42 (`data_splits.json`) |
+| Split | 1,600 train / 200 validation / 200 test, stratified per class, seed 42 (`dataset/data_splits.json`) |
 | Built by | `src/crop_hagrid_hands.py --promote` |
 | Checked by | `src/check_dataset.py`, `src/check_data_pipeline.py`, `tests/test_data_pipeline.py`, `tests/test_crop_hagrid_hands.py` |
 | In git | No. The images are gitignored and rebuilt from HaGRID; the split file and the build code are tracked. |
@@ -55,7 +55,7 @@ filename collisions between classes.
 ## The split
 
 `src/data_pipeline.py` shuffles each class's sorted file list with seed 42 and takes 400 / 50 / 50
-images for train / validation / test. The result is saved to `data_splits.json`. A test checks
+images for train / validation / test. The result is saved to `dataset/data_splits.json`. A test checks
 that rebuilding it from the dataset reproduces the committed file exactly, and the evaluation
 refuses a test split that is not 200 images, 50 per class, with no overlap with train or
 validation.

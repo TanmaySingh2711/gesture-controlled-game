@@ -21,7 +21,13 @@ def load_installer() -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("install", ROOT / "install.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Loading install.py from the project root must not leave a __pycache__/ folder there.
+    writes_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = writes_bytecode
     return module
 
 
@@ -45,21 +51,34 @@ def commands(installer: Any, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return ran
 
 
-def make_venv(folder: Path, created_at: Path) -> None:
+def make_venv(folder: Path, created_at: Path, options: str = "") -> None:
     folder.mkdir(parents=True)
+    command = f"C:\\Python312\\python.exe -m venv {options}{created_at}"
     (folder / "pyvenv.cfg").write_text(
-        f"home = C:\\Python312\nversion = 3.12.10\ncommand = C:\\Python312\\python.exe -m venv {created_at}\n",
-        encoding="utf-8",
+        f"home = C:\\Python312\nversion = 3.12.10\ncommand = {command}\n", encoding="utf-8"
     )
+
+
+@pytest.mark.parametrize(
+    "options", ["", "--clear ", "--upgrade-deps --clear ", '--prompt="my env" --clear ']
+)
+def test_the_folder_is_read_past_any_venv_options(
+    installer: Any, tmp_path: Path, options: str
+) -> None:
+    """`install.py --fresh` itself records --clear; that must not look like a moved venv."""
+    home = tmp_path / "folder with spaces" / "venv"
+    make_venv(home, home, options)
+    assert installer.venv_origin(home) == home
+    assert installer.moved_venv_problem(home) is None
 
 
 def test_a_machine_without_a_gpu_gets_the_cpu_build(installer: Any, commands: list[str]) -> None:
     assert installer.main([]) == 0
-    assert any("-r requirements-cpu.txt" in c for c in commands)
+    assert any("-r requirements/cpu.txt" in c for c in commands)
     assert any("-m venv" in c for c in commands)
     assert any("-e . --no-deps" in c for c in commands)
     assert commands[-1].endswith("src/environment_check.py --skip-webcam")
-    assert not any("requirements-dev.txt" in c for c in commands)
+    assert not any("requirements/dev.txt" in c for c in commands)
 
 
 def test_a_gpu_gets_the_cuda_build_unless_cpu_is_forced(
@@ -67,11 +86,11 @@ def test_a_gpu_gets_the_cuda_build_unless_cpu_is_forced(
 ) -> None:
     monkeypatch.setattr(installer, "has_nvidia_gpu", lambda: True)
     assert installer.main(["--dev"]) == 0
-    assert any(c.endswith("-r requirements.txt") for c in commands)
-    assert any("-r requirements-dev.txt" in c for c in commands)
+    assert any(c.endswith("-r requirements/cuda.txt") for c in commands)
+    assert any("-r requirements/dev.txt" in c for c in commands)
     commands.clear()
     assert installer.main(["--cpu"]) == 0
-    assert any("-r requirements-cpu.txt" in c for c in commands)
+    assert any("-r requirements/cpu.txt" in c for c in commands)
 
 
 def test_a_venv_moved_from_another_folder_is_caught(

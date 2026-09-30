@@ -11,7 +11,7 @@ venv\Scripts\activate                 # Windows  (source venv/bin/activate elsew
 pre-commit install                    # file checks, commit-message check, tests before push
 ```
 
-`install.py` picks `requirements.txt` (CUDA) or `requirements-cpu.txt` for you; see the README
+`install.py` picks `requirements/cuda.txt` (CUDA) or `requirements/cpu.txt` for you; see the README
 for the manual steps.
 
 ## Quality gates
@@ -77,6 +77,9 @@ environment, caches, dataset images, the unseen-subject test set and study weigh
 | `game/` | The Pac-Man game - pure Pygame, no CNN, fully playable on the keyboard |
 | `src/` | Dataset tools, training, evaluation, the recognizer and the integrated application |
 | `tests/` | The pytest suite |
-| `reports/` | Generated analysis: calibration, model study, memory profile, lineage and leakage audit |
-| `model/` | The frozen checkpoint and its training and evaluation records |
-| `docs/` | Architecture, model card, dataset card, model study and the manual test plan |
+| `reports/` | Every analysis: calibration, model study, memory, robustness, lineage and leakage audit; `p5_evaluation/` and `p6_live/` hold the frozen test-split and live-trial records |
+| `model/` | The frozen checkpoint and its training history and curves |
+| `dataset/` | The images (not in git), the frozen split (`data_splits.json`) and class mapping |
+| `requirements/` | `cuda.txt`, `cpu.txt` and `dev.txt` - the only place versions are pinned |
+| `docs/` | Architecture, model and dataset cards, model study, manual test plan, project spec, final test report, changelog, this file and the security notes |
+| `.cache/` | Every tool cache and coverage output (gitignored, safe to delete) |

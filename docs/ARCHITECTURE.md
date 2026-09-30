@@ -123,4 +123,4 @@ is signalled by colour alone.
 ## Security
 
 The checkpoint is verified against a pinned SHA-256 and loaded with `weights_only=True`, and its
-class mapping must match the active one. See [SECURITY.md](../SECURITY.md).
+class mapping must match the active one. See [SECURITY.md](SECURITY.md).

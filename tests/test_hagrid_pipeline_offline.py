@@ -119,13 +119,13 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         (tmp_path / "dataset" / name).mkdir(parents=True)
     monkeypatch.setattr(chh, "DATASET_DIR", str(tmp_path / "dataset"))
     monkeypatch.setattr(chh, "CROPPED_DIR", str(tmp_path / "dataset_cropped"))
-    monkeypatch.setattr(chh, "CACHE_DIR", str(tmp_path / ".hagrid_cache"))
+    monkeypatch.setattr(chh, "CACHE_DIR", str(tmp_path / ".cache" / "hagrid"))
     monkeypatch.setattr(audit, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(audit, "DATASET_DIR", tmp_path / "dataset")
     monkeypatch.setattr(audit, "SPLITS_FILE", tmp_path / "data_splits.json")
     monkeypatch.setattr(audit, "REPORTS_DIR", tmp_path / "reports")
     monkeypatch.setattr(audit, "EXTERNAL_DIR", tmp_path / "dataset_external")
-    monkeypatch.setattr(audit, "DIGEST_CACHE", tmp_path / ".hagrid_cache" / "digests.json")
+    monkeypatch.setattr(audit, "DIGEST_CACHE", tmp_path / ".cache" / "hagrid" / "digests.json")
     return tmp_path
 
 
@@ -150,7 +150,7 @@ def test_build_then_audit_recovers_every_crop_and_its_person(
     built = sorted(p.relative_to(workspace).as_posix() for p in workspace.rglob("dataset/*/*.jpg"))
     assert len(built) == 4 * PER_CLASS
     assert not (workspace / "dataset_cropped").exists(), "promotion removes the staging folder"
-    assert (workspace / ".hagrid_cache" / "ann_fist.json").exists(), "--keep-cache kept it"
+    assert (workspace / ".cache" / "hagrid" / "ann_fist.json").exists(), "--keep-cache kept it"
 
     # --- audit ---------------------------------------------------------------------------
     by_class = {
@@ -188,7 +188,7 @@ def test_build_then_audit_recovers_every_crop_and_its_person(
     assert not {info["user_id"] for info in manifest["files"].values()} & dataset_people
 
     # A second audit reuses the cached crop hashes rather than recomputing them.
-    assert json.loads((workspace / ".hagrid_cache" / "digests.json").read_text("utf-8"))
+    assert json.loads((workspace / ".cache" / "hagrid" / "digests.json").read_text("utf-8"))
     assert project_snapshot() == before, "the real project folders were touched"
 
 
@@ -210,7 +210,7 @@ def test_an_incomplete_build_is_not_promoted_and_drops_its_cache(
     assert "RESULT: INCOMPLETE" in output
     assert "missing=1" in output  # the member absent from the archive was skipped, not fatal
     assert not list((workspace / "dataset" / "left").glob("*.jpg")), "nothing was promoted"
-    assert not (workspace / ".hagrid_cache").exists(), "the annotation cache was dropped"
+    assert not (workspace / ".cache" / "hagrid").exists(), "the annotation cache was dropped"
 
 
 def test_audit_refuses_annotations_without_people(
@@ -219,8 +219,8 @@ def test_audit_refuses_annotations_without_people(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    cache = workspace / ".hagrid_cache"
-    cache.mkdir()
+    cache = workspace / ".cache" / "hagrid"
+    cache.mkdir(parents=True)
     for gesture, records in hagrid_server["annotations"].items():
         stripped = {
             uuid: {k: v for k, v in r.items() if k != "user_id"} for uuid, r in records.items()

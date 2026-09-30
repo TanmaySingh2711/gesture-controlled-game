@@ -5,7 +5,7 @@
 # The plain-PyPI `torch` wheel on Windows is CPU-only, which this project does not accept.
 # The index directives below are part of the file, so the normal command still works:
 #
-#     pip install -r requirements.txt
+#     pip install -r requirements/cuda.txt
 #
 # Equivalent manual command (CUDA 13.0 build, matches the RTX 3050 Ti driver):
 #

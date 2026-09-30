@@ -62,7 +62,7 @@ from src.crop_hagrid_hands import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = PROJECT_ROOT / "dataset"
-SPLITS_FILE = PROJECT_ROOT / "data_splits.json"
+SPLITS_FILE = DATASET_DIR / "data_splits.json"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 EXTERNAL_DIR = PROJECT_ROOT / "dataset_external"
 
@@ -82,7 +82,7 @@ EXTERNAL_SEED = 2026  # independent of the P2 seed, so the external draw is a fr
 
 # Crop hashes are persisted as they are computed, so a dropped connection part-way through
 # never throws away finished work: a rerun picks up exactly where the last one stopped.
-DIGEST_CACHE = PROJECT_ROOT / ".hagrid_cache" / "lineage_digests.json"
+DIGEST_CACHE = PROJECT_ROOT / ".cache" / "hagrid" / "lineage_digests.json"
 DIGEST_SAVE_EVERY = 25
 
 Candidate = tuple[str, str, list[float]]

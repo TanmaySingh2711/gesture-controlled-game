@@ -402,7 +402,7 @@ Each phase ends with a verification step and a stop, as in the previous workflow
 
 > **Note on P6's transition figure.** "0/6 spurious transitions" is the second of two transition
 > runs recorded four minutes apart with the same settings. The first, 12 transitions, had 2 that
-> passed through a wrong command and 6 that took over 3 s. Both are kept in `model/`, and the
+> passed through a wrong command and 6 that took over 3 s. Both are kept in `reports/p6_live/`, and the
 > README and model card now report them together (2 of 18).
 
 Work continues under the objective numbering that replaced `P8`.

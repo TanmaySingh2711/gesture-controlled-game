@@ -82,7 +82,7 @@ MIN_BOX_FRACTION = 0.10  # skip boxes smaller than this fraction of the image's 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
 CROPPED_DIR = os.path.join(PROJECT_ROOT, "dataset_cropped")
-CACHE_DIR = os.path.join(PROJECT_ROOT, ".hagrid_cache")
+CACHE_DIR = os.path.join(PROJECT_ROOT, ".cache", "hagrid")  # annotations, re-downloadable
 
 
 class RangeFile(io.RawIOBase):

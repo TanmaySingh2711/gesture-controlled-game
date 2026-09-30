@@ -1,13 +1,13 @@
-# Quality gates on every commit:  pre-commit install   (pre-commit is in requirements-dev.txt)
+# Quality gates on every commit:  pre-commit install   (pre-commit is in requirements/dev.txt)
 # Run everything by hand at any time with:  pre-commit run --all-files
 
 # `pre-commit install` sets up all three stages: the file checks before a commit, the message
 # check when it is written, and the fast tests before a push.
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
-# Frozen records (model/, the split files) are excluded too: whitespace fixers must never
-# rewrite a byte of them.
-exclude: ^((archive|dataset|dataset_external|model|venv)/|(data_splits|class_mapping)\.json$)
+# Frozen records (model/, the split files in dataset/, the P5 and P6 results) are excluded too:
+# whitespace fixers must never rewrite a byte of them.
+exclude: ^(dataset|dataset_external|model|reports/p5_evaluation|reports/p6_live|venv|\.cache)/
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

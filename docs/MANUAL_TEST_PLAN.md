@@ -87,7 +87,7 @@ python src/realtime_gesture.py --transitions --repeats 2 --participant NAME --co
 ```
 
 Each command writes a new file to `reports/live_sessions/`; nothing overwrites an earlier session
-or the P6 records in `model/`. Afterwards:
+or the P6 records in `reports/p6_live/`. Afterwards:
 
 ```bash
 python -m src.live_report --include-p6

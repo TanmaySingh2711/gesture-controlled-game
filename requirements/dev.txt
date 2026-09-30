@@ -1,6 +1,6 @@
-# Development tooling for gesture-pacman - install after requirements.txt:
+# Development tooling for gesture-pacman - install after cuda.txt or cpu.txt:
 #
-#     pip install -r requirements-dev.txt
+#     pip install -r requirements/dev.txt
 #     pip install -e . --no-deps
 #
 # Nothing here is needed to play the game; it is what the test, lint and type checks use.

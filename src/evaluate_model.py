@@ -52,12 +52,13 @@ from src.data_pipeline import (
 )
 from src.train_model import CHECKPOINT_PATH, load_direction_checkpoint
 
-MODEL_DIR = os.path.join(PROJECT_ROOT, "model")
-METRICS_PATH = os.path.join(MODEL_DIR, "direction_evaluation_metrics.json")
-CONFUSION_PATH = os.path.join(MODEL_DIR, "direction_confusion_matrix.png")
-PREDICTIONS_PATH = os.path.join(MODEL_DIR, "direction_test_predictions.csv")
-MISCLASSIFIED_PATH = os.path.join(MODEL_DIR, "direction_misclassified_samples.png")
-LOW_CONFIDENCE_PATH = os.path.join(MODEL_DIR, "direction_low_confidence_correct.png")
+# The P5 results: written once, by the single evaluation on the test split, and frozen since.
+P5_DIR = os.path.join(PROJECT_ROOT, "reports", "p5_evaluation")
+METRICS_PATH = os.path.join(P5_DIR, "direction_evaluation_metrics.json")
+CONFUSION_PATH = os.path.join(P5_DIR, "direction_confusion_matrix.png")
+PREDICTIONS_PATH = os.path.join(P5_DIR, "direction_test_predictions.csv")
+MISCLASSIFIED_PATH = os.path.join(P5_DIR, "direction_misclassified_samples.png")
+LOW_CONFIDENCE_PATH = os.path.join(P5_DIR, "direction_low_confidence_correct.png")
 
 CLASSES = list(CLASS_TO_INDEX)  # left, right, up, down - fixed order
 NUM_CLASSES = len(CLASSES)

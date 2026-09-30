@@ -11,8 +11,8 @@ each verified before the next began; the entries below follow those phases.
   auto|cuda|cpu` on `play_gesture.py`, `realtime_gesture.py` and `measure_memory.py`. The device is
   logged at start-up and shown in the panel's small print, so the fallback is never silent.
   Training and the P5 evaluation still require CUDA.
-- **One-command setup:** `install.py` creates the venv, picks `requirements.txt` (CUDA) or the
-  new `requirements-cpu.txt`, installs the project and runs the environment check. It stops early,
+- **One-command setup:** `install.py` creates the venv, picks `requirements/cuda.txt` (CUDA) or the
+  new `requirements/cpu.txt`, installs the project and runs the environment check. It stops early,
   with the fix, when a Windows path is too long for PyTorch to install, or when `venv/` was
   created in another folder (its command shortcuts then point at the old folder and fail
   silently); `--fresh` rebuilds it.
@@ -35,7 +35,24 @@ each verified before the next began; the entries below follow those phases.
   coverage drops below 90%.
 - **Commit messages:** a `commit-message` pre-commit hook requires a conventional prefix such as
   `fix:` or `docs:` (so "Update" is refused); `pre-commit install` sets up all three hook stages.
-  `pre-commit` is pinned in `requirements-dev.txt`. The README shows the CI status badge.
+  `pre-commit` is pinned in `requirements/dev.txt`. The README shows the CI status badge.
+
+### Reorganised
+- **Project root holds only the essentials:** `README.md`, `install.py`, `pyproject.toml` and the
+  folders. Every other document moved to `docs/` (changelog, contributing, security, project
+  spec, final test report), the requirements files to `requirements/` (`cuda.txt`, `cpu.txt`,
+  `dev.txt`), and the frozen split and class mapping into `dataset/`.
+- **`model/` holds only the model:** the checkpoint and its training history and curves. The P5
+  test-split results moved to `reports/p5_evaluation/` and the P6 live-trial records to
+  `reports/p6_live/`. Every moved record is byte-identical (checked by SHA-256 before and after).
+- **One folder for everything regenerated:** the mypy, ruff, pytest and Hypothesis caches,
+  coverage data and reports, and the downloaded HaGRID annotations now all go to the gitignored
+  `.cache/`, configured in `pyproject.toml` and `tests/conftest.py`.
+- **Removed** `archive/` (the retired `prepare_hagrid_dataset.py`, which refused to run and was
+  replaced by `src/crop_hagrid_hands.py`; it remains in git history) and stale local caches.
+- **CI** is now eight checks: lint (ruff), type check (mypy), tests on Windows, macOS and Linux,
+  and a one-click setup on all three that runs `python install.py` and starts the game from the
+  environment it built. Library versions come only from `requirements/`.
 
 ### Changed
 - **Live results are reported in full.** The P6 transition figure "0/6 wrong turns" was the second
@@ -43,7 +60,7 @@ each verified before the next began; the entries below follow those phases.
   through a wrong command and 6 slower than 3 s. The README, model card and architecture notes now
   report both (2 of 18). "143 ms" is now described as what it is - the recognizer's own decision
   time - next to the 1.3 s median a whole gesture change takes.
-- Live recorders no longer default to the frozen P6 files in `model/`; a new session could
+- Live recorders no longer default to the frozen P6 files; a new session could
   previously overwrite them.
 
 ### Fixed
@@ -54,7 +71,7 @@ each verified before the next began; the entries below follow those phases.
   outside the project folder.
 - `check_data_pipeline.py` failed its CUDA transfer check on a machine without a GPU; it now skips
   it, since the pipeline serves the CPU too.
-- `setuptools` pinned to 84.0.0 in `requirements-dev.txt`: the PyTorch CPU index only carries
+- `setuptools` pinned to 84.0.0 in `requirements/dev.txt`: the PyTorch CPU index only carries
   78.1.0, which `pip-audit` rejects, and that failed CI.
 
 ## Quality and rigour round

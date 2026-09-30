@@ -14,6 +14,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from hypothesis.configuration import set_hypothesis_home_dir
+
+# Hypothesis keeps its example database with the other tool caches, not in the project root.
+set_hypothesis_home_dir(str(Path(__file__).resolve().parent.parent / ".cache" / "hypothesis"))
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")

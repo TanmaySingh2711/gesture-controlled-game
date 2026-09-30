@@ -63,8 +63,8 @@ NO_COMMAND_LABEL: Final = "NO COMMAND"
 
 EXPECTED_TASK: Final = "pacman_direction_v1"
 
-# Fixed capture geometry, frozen in PROJECT_SPEC.md section 7 and unchanged since the dataset was
-# built. The ROI is what the CNN sees; everything outside it is ignored.
+# Fixed capture geometry, frozen in docs/PROJECT_SPEC.md section 7 and unchanged since the dataset
+# was built. The ROI is what the CNN sees; everything outside it is ignored.
 FRAME_WIDTH: Final = 640
 FRAME_HEIGHT: Final = 480
 ROI_X1: Final = 300

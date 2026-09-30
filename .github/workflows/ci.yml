@@ -1,11 +1,18 @@
 name: CI
 
-# Everything that can run without a GPU or a webcam runs here on every push: formatting, lint,
-# static types, the pytest suite with coverage, and the legacy self-test scripts.
+# Eight checks on every push and pull request:
 #
-# The application itself requires CUDA, so CI installs the CPU build of PyTorch purely to test
-# the parts that import it (checkpoint loading, evaluation statistics). Tests marked `gpu` skip
-# automatically, and `webcam` tests only run when GESTURE_WEBCAM_TESTS=1 is set on a real machine.
+#   Lint (ruff)                 formatting and lint
+#   Type check (mypy)           static types
+#   Tests (3 operating systems) the pytest suite with coverage (fails below 90%); on Ubuntu also
+#                               the dependency audit
+#   One-click setup (3 OSes)    `python install.py` exactly as a new player runs it, then the
+#                               game started headless from the environment it built
+#
+# No runner has a GPU or a webcam, so everything runs on the CPU build of PyTorch - which is also
+# what players without an NVIDIA GPU install. Tests marked `gpu` skip themselves, and `webcam`
+# tests run only when GESTURE_WEBCAM_TESTS=1 is set on a real machine. Library versions come from
+# requirements/, never from this file, so CI tests exactly what the project pins.
 
 on:
   push:
@@ -18,52 +25,133 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SDL_VIDEODRIVER: dummy
+  SDL_AUDIODRIVER: dummy
+  PYGAME_HIDE_SUPPORT_PROMPT: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
 jobs:
-  quality:
+  lint:
+    name: Lint (ruff)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      SDL_VIDEODRIVER: dummy
-      SDL_AUDIODRIVER: dummy
-      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff (the version pinned in requirements/dev.txt)
+        run: pip install "$(grep '^ruff==' requirements/dev.txt)"
+      - name: Formatting
+        run: ruff format --check .
+      - name: Lint
+        run: ruff check --output-format=github .
 
+  typecheck:
+    name: Type check (mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
-      - name: Install dependencies (CPU PyTorch for CI)
+          cache-dependency-path: requirements/*.txt
+      # mypy follows the imports into torch and numpy, so the libraries must be installed.
+      - name: Install dependencies (CPU PyTorch)
         run: |
-          python -m pip install --upgrade pip
-          pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install pygame==2.6.1 numpy==2.5.3 matplotlib==3.11.2 scikit-learn==1.9.1 \
-                      pillow==12.3.0 opencv-python-headless==5.0.0.93
-          pip install -r requirements-dev.txt
+          pip install -r requirements/cpu.txt -r requirements/dev.txt
           pip install -e . --no-deps
-
-      - name: Formatting
-        run: ruff format --check .
-
-      - name: Lint
-        run: ruff check .
-
       - name: Static types
         run: mypy game src tests install.py
+
+  tests:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      - name: Install dependencies (CPU PyTorch)
+        run: |
+          pip install -r requirements/cpu.txt -r requirements/dev.txt
+          pip install -e . --no-deps
+
+      # A Linux runner has no display libraries for OpenCV's window support, which the tests
+      # never use; the headless build of the same pinned version replaces it.
+      - name: Use headless OpenCV (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          version="$(grep '^opencv-python==' requirements/cpu.txt | cut -d= -f3)"
+          pip uninstall -y opencv-python
+          pip install "opencv-python-headless==${version}"
 
       # Includes the standalone self-test scripts (tests/test_self_tests.py), each in a fresh
       # interpreter, with their coverage measured through coverage's subprocess patch.
       - name: Tests with coverage
         run: pytest --cov=game --cov=src --cov-report=term-missing --cov-report=xml
 
-      # Fails the build on any known vulnerability. The CPU torch wheels come from the PyTorch
-      # index, which pip-audit cannot query; it reports them as skipped rather than failing.
+      # Fails on any known vulnerability. PyTorch comes from the PyTorch index, which pip-audit
+      # cannot query; it reports torch and torchvision as skipped rather than failing.
       - name: Dependency audit
+        if: runner.os == 'Linux'
         run: pip-audit --skip-editable
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && runner.os == 'Linux'
         with:
           name: coverage
-          path: coverage.xml
+          path: .cache/coverage/coverage.xml
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  setup:
+    name: One-click setup (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      # A desktop Linux has these already; a bare runner needs them for OpenCV (see README).
+      - name: System libraries for OpenCV (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1
+
+      # The whole player setup: venv, CPU PyTorch (no GPU here), the project, and the
+      # environment check, which loads the real model and times a frame on the CPU.
+      - name: python install.py
+        run: python install.py
+
+      - name: The game starts from the environment it built
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then python=venv/Scripts/python.exe; else python=venv/bin/python; fi
+          "$python" src/play_gesture.py --no-camera --benchmark 120 --log-level WARNING
+          "$python" game/main.py --selftest

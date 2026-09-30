@@ -10,8 +10,8 @@ What it does, in order:
 1. checks this is 64-bit Python 3.12,
 2. creates ``venv/`` (or reuses it - unless it was created in another folder, whose command
    shortcuts such as ``venv/Scripts/mypy.exe`` would still point there),
-3. installs ``requirements.txt`` (CUDA build) when an NVIDIA GPU is found, otherwise
-   ``requirements-cpu.txt`` - gesture control works on either,
+3. installs ``requirements/cuda.txt`` (CUDA build) when an NVIDIA GPU is found, otherwise
+   ``requirements/cpu.txt`` - gesture control works on either,
 4. installs the project itself in editable mode, so ``game`` and ``src`` import from this folder
    wherever it lives (a moved folder is fixed by simply running this again),
 5. runs ``src/environment_check.py`` inside the new environment.
@@ -22,6 +22,7 @@ Uses only the standard library, so it runs with any Python 3.12 before anything 
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import struct
 import subprocess
@@ -37,6 +38,10 @@ REQUIRED_PYTHON = (3, 12)
 # path therefore fails half-way through the install with a confusing pip error.
 WINDOWS_MAX_PATH = 260
 DEEPEST_PACKAGE_PATH = 140
+
+# The options `python -m venv` records before the folder: --clear, --upgrade-deps,
+# --prompt="my env" and so on.
+VENV_OPTIONS = re.compile(r'^(?:--[\w-]+(?:="[^"]*"|=\S+)?\s+)*')
 
 
 def venv_python() -> Path:
@@ -90,14 +95,20 @@ def path_problem() -> str | None:
 
 
 def venv_origin(venv: Path | None = None) -> Path | None:
-    """Where `venv` (default: VENV) was created, from the `command` line in pyvenv.cfg."""
+    """Where `venv` (default: VENV) was created, from the `command` line in pyvenv.cfg.
+
+    Python writes that line as `<python> -m venv [--options] <folder>`, with the folder last and
+    unquoted (it may contain spaces), so the options are stripped from the front.
+    """
     config = (venv or VENV) / "pyvenv.cfg"
     if not config.exists():
         return None
     for line in config.read_text(encoding="utf-8").splitlines():
         key, _, value = line.partition("=")
         if key.strip() == "command" and " -m venv " in value:
-            return Path(value.split(" -m venv ", 1)[1].strip().strip('"'))
+            arguments = value.split(" -m venv ", 1)[1].strip()
+            folder = VENV_OPTIONS.sub("", arguments).strip().strip('"')
+            return Path(folder) if folder else None
     return None
 
 
@@ -146,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     gpu = not args.cpu and has_nvidia_gpu()
-    requirements = "requirements.txt" if gpu else "requirements-cpu.txt"
+    requirements = "requirements/cuda.txt" if gpu else "requirements/cpu.txt"
     print(f"NVIDIA GPU: {'found' if gpu else 'not used'} -> installing {requirements}")
 
     if args.fresh and VENV.exists():
@@ -160,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.dev:
         run(
             "install the developer tools",
-            [python, "-m", "pip", "install", "-r", "requirements-dev.txt"],
+            [python, "-m", "pip", "install", "-r", "requirements/dev.txt"],
         )
     run("install the project", [python, "-m", "pip", "install", "-e", ".", "--no-deps"])
     run("check the environment", [python, "src/environment_check.py", "--skip-webcam"])

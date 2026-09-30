@@ -146,7 +146,7 @@ augmentation never included noise or blur, which is the likely reason.
 
 The two transition runs used identical settings, four minutes apart; the first used an earlier
 version of the recorder that did not yet time the recognizer separately from the hand. Both are
-kept in `model/`. The threshold and the smoothing window were both chosen from these live
+kept in `reports/p6_live/`. The threshold and the smoothing window were both chosen from these live
 trials, never from the test set.
 
 ## Limitations and risks
@@ -178,4 +178,4 @@ trials, never from the test set.
 
 The loader refuses any file whose SHA-256 differs from the pinned value, loads with
 `torch.load(weights_only=True)` so the file cannot run code, and refuses a checkpoint whose class
-mapping differs from the active one. See [SECURITY.md](../SECURITY.md).
+mapping differs from the active one. See [SECURITY.md](SECURITY.md).

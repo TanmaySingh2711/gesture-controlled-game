@@ -37,9 +37,9 @@ webcam's 33 ms frame interval.
 | Camera conditions | 97.9-99.4% under dim light, colour casts, JPEG, low resolution and a tilted hand; drops to 94% with harsh light, 77% with strong blur and 59% with heavy dark-room noise (simulated, [MODEL_CARD.md](docs/MODEL_CARD.md#robustness-to-simulated-camera-conditions)) |
 | Known limitations | no reject class: a deliberate unsupported gesture (e.g. a peace sign) can be read as a direction - use only the four. Play in a lit room: webcam noise in the dark causes confident misreads |
 
-Status: the project passed final testing and manual acceptance ([FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md)).
+Status: the project passed final testing and manual acceptance ([FINAL_TEST_REPORT.md](docs/FINAL_TEST_REPORT.md)).
 A later quality round added accessibility, security hardening, statistical rigour, a proper test
-suite and tooling; see [CHANGELOG.md](CHANGELOG.md).
+suite and tooling; see [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## How to play
 
@@ -59,15 +59,17 @@ turn is taken when it becomes possible.
 
 ## Setup
 
-Python 3.12 (64-bit). A webcam for gesture control. An NVIDIA GPU is optional.
+Python 3.12 (64-bit) on Windows, macOS or Linux. A webcam for gesture control. An NVIDIA GPU is
+optional. On a minimal Linux install, OpenCV also needs the `libgl1` system package
+(`sudo apt-get install libgl1`); desktop distributions already have it.
 
 ```bash
 python install.py          # players
 python install.py --dev    # developers: also the test, lint and type-check tools
 ```
 
-`install.py` creates `venv/`, installs the CUDA build of PyTorch (`requirements.txt`) when it finds
-an NVIDIA GPU and the CPU build (`requirements-cpu.txt`) otherwise, installs the project, and runs
+`install.py` creates `venv/`, installs the CUDA build of PyTorch (`requirements/cuda.txt`) when it finds
+an NVIDIA GPU and the CPU build (`requirements/cpu.txt`) otherwise, installs the project, and runs
 `src/environment_check.py`, which loads the real model and times a frame on your machine. After
 moving the project folder, run `python install.py --fresh`: a venv keeps pointing at the folder it
 was created in, and the installer says so instead of letting commands fail mysteriously. On
@@ -83,8 +85,8 @@ model (`src/train_model.py`) requires CUDA.
 ```bash
 python -m venv venv
 venv\Scripts\activate                 # Windows  (source venv/bin/activate elsewhere)
-pip install -r requirements.txt       # NVIDIA GPU (CUDA build);  or: -r requirements-cpu.txt
-pip install -r requirements-dev.txt   # testing and quality tools
+pip install -r requirements/cuda.txt       # NVIDIA GPU (CUDA build);  or: -r requirements/cpu.txt
+pip install -r requirements/dev.txt   # testing and quality tools
 pip install -e . --no-deps            # makes the `game` and `src` packages importable
 python src/environment_check.py       # verifies Python, libraries, the model and the webcam
 ```
@@ -166,7 +168,7 @@ but a single frame cannot win a 3-of-5 vote.
 
 ```bash
 python -m src.analyze_evaluation   # confidence intervals and calibration from the saved predictions
-python src/train_model.py          # retrain (overwrites the frozen checkpoint - see SECURITY.md)
+python src/train_model.py          # retrain (overwrites the frozen checkpoint - see docs/SECURITY.md)
 ```
 
 The confidence intervals matter: with 200 test images, "99%" alone overstates what is known.
@@ -200,7 +202,7 @@ Live trials, one webcam and one room (how many people took part was not recorded
 | Gesture changes, published run | 6 changes: none passed through a wrong command; 0.8-1.6 s each |
 | Gesture changes, first attempt | 12 changes, 4 minutes earlier with the same settings: **2 passed through a wrong command** on the way (right->up briefly gave DOWN, left->right briefly gave UP), and 6 took over 3 s (up to 15 s) |
 
-Both transition runs are kept in `model/` (`live_direction_transitions.csv` and
+Both transition runs are kept in `reports/p6_live/` (`live_direction_transitions.csv` and
 `live_direction_transitions_firstattempt.csv`). Taken together, 2 of 18 changes briefly issued a
 wrong command, so a wrong turn during a quick change is possible, if uncommon.
 
@@ -220,7 +222,7 @@ has the protocol for testing with several people and rooms.
 
 The model file is verified against a pinned SHA-256 and loaded with `torch.load(weights_only=True)`,
 so a tampered or malicious checkpoint cannot load or run code; its class mapping must also match.
-See [SECURITY.md](SECURITY.md) for the full threat model.
+See [SECURITY.md](docs/SECURITY.md) for the full threat model.
 
 ## Dataset
 
@@ -252,14 +254,20 @@ python -m src.evaluate_external      # frozen model on unseen people (after the 
 python -m src.evaluate_robustness    # the same people under simulated lighting, blur and noise
 ```
 
-CI runs formatting, lint, types, the test suite and a dependency audit on every push. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the project rules that protect the reported results, and
-[docs/MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for the checks that need a real hand.
+CI runs eight checks on every push: lint (ruff), type check (mypy), the test suite with
+coverage on Windows, macOS and Linux (plus the dependency audit on Linux), and a one-click setup
+on all three - `python install.py` exactly as a new player runs it, then the game started from the
+environment it built. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the project rules that
+protect the reported results, and [MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for the checks
+that need a real hand.
 
 ## Project structure
 
 ```text
 gesture-controlled-game/
+├── README.md
+├── install.py                # one-command setup:  python install.py
+├── pyproject.toml            # packaging and every tool's settings
 ├── game/                     # the game - Pygame only, no CNN
 │   ├── engine.py             # rules, rounds, drawing
 │   ├── maze.py  entity.py  player.py  ghost.py  controls.py
@@ -267,24 +275,31 @@ gesture-controlled-game/
 │   └── main.py               # keyboard launcher and self-test
 ├── src/                      # recognition, training, evaluation and the application
 │   ├── play_gesture.py       # the application
-│   ├── game_integration.py   # recognition worker and gesture bridge
-│   ├── gesture_recognizer.py
-│   ├── data_pipeline.py  train_model.py  evaluate_model.py  analyze_evaluation.py
-│   ├── model_study.py  audit_hagrid_lineage.py  evaluate_external.py  measure_memory.py
-│   ├── crop_hagrid_hands.py  check_dataset.py  check_data_pipeline.py  collect_dataset.py
-│   ├── realtime_gesture.py  environment_check.py
-│   └── check_integration.py  check_ui.py  check_final_application.py
-├── tests/                    # pytest suite
-├── docs/                     # architecture, model and dataset cards, model study, manual test plan
-├── reports/                  # generated analyses (QA image sheets go to reports/qa/, untracked)
-├── model/                    # the frozen checkpoint and its training and evaluation records
-├── dataset/                  # 500 images per class (images not tracked in git)
-├── archive/                  # retired scripts, kept for the record
-├── install.py                # one-command setup
-├── pyproject.toml  requirements.txt  requirements-cpu.txt  requirements-dev.txt
-├── README.md  CHANGELOG.md  CONTRIBUTING.md  SECURITY.md
-└── PROJECT_SPEC.md  FINAL_TEST_REPORT.md
+│   ├── game_integration.py  gesture_recognizer.py  realtime_gesture.py
+│   ├── data_pipeline.py  train_model.py  model_study.py
+│   ├── evaluate_model.py  analyze_evaluation.py  evaluate_external.py  evaluate_robustness.py
+│   ├── crop_hagrid_hands.py  audit_hagrid_lineage.py  collect_dataset.py
+│   ├── live_report.py  measure_memory.py  environment_check.py
+│   └── check_*.py            # the standalone self-test scripts
+├── tests/                    # the pytest suite
+├── requirements/             # cuda.txt (NVIDIA GPU), cpu.txt (everyone else), dev.txt (tools)
+├── model/                    # the frozen checkpoint and its training history and curves
+├── dataset/                  # 500 images per class (not in git), the frozen split and mapping
+├── dataset_external/         # the unseen-people test set (images not in git) and its manifest
+├── reports/                  # every analysis the project produced
+│   ├── p5_evaluation/        # the one test-split evaluation: metrics, predictions, figures
+│   ├── p6_live/              # the original live webcam trials
+│   ├── live_sessions/        # new live sessions, one file each (created when you record)
+│   └── qa/                   # QA image sheets from the check scripts (regenerated, not in git)
+├── docs/                     # architecture, model and dataset cards, model study, test plan,
+│                             # project spec, final test report, changelog, contributing, security
+└── .github/workflows/ci.yml  # lint, types, tests and one-click setup on Windows, macOS, Linux
 ```
+
+Everything the tools regenerate - the mypy, ruff, pytest and Hypothesis caches, coverage data
+and reports, downloaded HaGRID annotations - goes into one gitignored `.cache/` folder, which is
+safe to delete at any time. `pip install -e .` also leaves a `gesture_pacman.egg-info/` folder,
+which pip itself places in the project root; it is gitignored too.
 
 ## Credits
 
