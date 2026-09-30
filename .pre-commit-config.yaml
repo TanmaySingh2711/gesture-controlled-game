@@ -1,5 +1,9 @@
-# Quality gates on every commit:  pip install pre-commit  &&  pre-commit install
+# Quality gates on every commit:  pre-commit install   (pre-commit is in requirements-dev.txt)
 # Run everything by hand at any time with:  pre-commit run --all-files
+
+# `pre-commit install` sets up all three stages: the file checks before a commit, the message
+# check when it is written, and the fast tests before a push.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 # Frozen records (model/, the split files) are excluded too: whitespace fixers must never
 # rewrite a byte of them.
@@ -28,7 +32,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: mypy game src tests
+        entry: mypy game src tests install.py
         language: system
         pass_filenames: false
         types: [python]
@@ -39,3 +43,14 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+
+      # A message like "Update" says nothing about what changed. The first line must start with
+      # a conventional prefix and say what changed, e.g. "fix: keep CAMERA ERROR visible".
+      # Merge and revert messages written by git itself are allowed as they are.
+      - id: commit-message
+        name: "commit message: '<type>: <what changed>' (feat fix test docs refactor perf chore ci build style)"
+        language: pygrep
+        entry: '\A(?:(?:feat|fix|test|docs|refactor|perf|chore|ci|build|style)(?:\([a-z0-9-]+\))?!?: \S[^\n]{7,}|Merge [^\n]+|Revert "[^\n]+)'
+        # --multiline also lets "." match line breaks, so [^\n] keeps the check on the first line.
+        args: [--negate, --multiline]
+        stages: [commit-msg]

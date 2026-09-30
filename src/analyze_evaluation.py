@@ -301,10 +301,16 @@ def main(argv: list[str] | None = None) -> int:
         f"({live['coverage']:.1%}), accuracy {live['accuracy']:.4f}, "
         f"{live['errors_accepted']} errors accepted"
     )
-    print(
-        f"saved {args.report.relative_to(PROJECT_ROOT)} and {args.figure.relative_to(PROJECT_ROOT)}"
-    )
+    print(f"saved {shown(args.report)} and {shown(args.figure)}")
     return 0
+
+
+def shown(path: Path) -> str:
+    """A path relative to the project when it is inside it, otherwise as given."""
+    try:
+        return str(path.resolve().relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
 
 
 if __name__ == "__main__":

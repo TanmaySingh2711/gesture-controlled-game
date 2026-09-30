@@ -12,6 +12,13 @@ Modes:
     python src/realtime_gesture.py --benchmark 300      measure the live pipeline, then exit
     python src/realtime_gesture.py --selftest           headless verification, no window
 
+Recording sessions with several people and rooms:
+    python src/realtime_gesture.py --trials --participant riya --condition dim-room
+    python -m src.live_report                            combine every session into one report
+
+Recordings go to reports/live_sessions/, one file per session, named after the participant, the
+condition and the time. The P6 records in model/ are never written unless --out names them.
+
 Trial categories include two that are not CNN classes:
 
     no_hand     empty ROI            - the correct result is NO COMMAND
@@ -53,6 +60,7 @@ from src.gesture_recognizer import (
     DEFAULT_MIN_AGREEMENT,
     DEFAULT_THRESHOLD,
     DEFAULT_WINDOW,
+    DEVICE_CHOICES,
     DIRECTION_HELP,
     DIRECTIONS,
     FRAME_HEIGHT,
@@ -70,9 +78,11 @@ from src.gesture_recognizer import (
 
 TRIALS_PER_CLASS = 20
 MODEL_DIR = os.path.join(PROJECT_ROOT, "model")
+# The frozen P6 records. Kept for reference; new sessions never default to them.
 TRIALS_CSV = os.path.join(MODEL_DIR, "live_direction_test_baseline.csv")
 IDLE_CSV = os.path.join(MODEL_DIR, "live_direction_idle_baseline.csv")
 TRANSITIONS_CSV = os.path.join(MODEL_DIR, "live_direction_transitions.csv")
+SESSIONS_DIR = os.path.join(PROJECT_ROOT, "reports", "live_sessions")
 
 # Categories whose correct outcome is "no command issued" rather than a direction.
 NO_COMMAND_CATEGORIES = ("no_hand", "idle_hand")
@@ -272,6 +282,19 @@ def read_action(window: str) -> str | None:
     return KEY_ACTIONS.get(key)
 
 
+def slug(text: str) -> str:
+    """A filename-safe version of a label: letters, digits and dashes only."""
+    cleaned = "".join(c if c.isalnum() else "-" for c in text.strip().lower())
+    return "-".join(part for part in cleaned.split("-") if part) or "unnamed"
+
+
+def session_path(mode: str, participant: str, condition: str) -> str:
+    """A new file under reports/live_sessions/ for one recording session - never an old one."""
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    name = f"{stamp}_{slug(participant)}_{slug(condition)}_{mode}.csv"
+    return os.path.join(SESSIONS_DIR, name)
+
+
 def write_records(out_path: str, records: list[dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
@@ -393,7 +416,11 @@ def trial_record(
 
 
 def trials(
-    recognizer: DirectionRecognizer, category_list: list[str], count: int, out_path: str
+    recognizer: DirectionRecognizer,
+    category_list: list[str],
+    count: int,
+    out_path: str,
+    labels: dict[str, str] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Guided recorder. SPACE records the current stable command for the prompt.
 
@@ -434,7 +461,7 @@ def trials(
             if action not in ("skip", "record"):
                 continue
             if action == "record":
-                record = trial_record(position, expected, result, recognizer)
+                record = {**(labels or {}), **trial_record(position, expected, result, recognizer)}
                 records.append(record)
                 mark = "OK " if record["correct"] == "yes" else "MISS"
                 print(
@@ -599,7 +626,10 @@ def summarise_transitions(records: list[dict[str, Any]]) -> None:
 
 
 def transitions(
-    recognizer: DirectionRecognizer, repeats: int, out_path: str
+    recognizer: DirectionRecognizer,
+    repeats: int,
+    out_path: str,
+    labels: dict[str, str] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Transition stress test: press SPACE as you START moving to the target gesture.
 
@@ -631,7 +661,7 @@ def transitions(
             if timer is not None:
                 timer.observe(result, time.perf_counter())
                 if timer.done:
-                    record = timer.record(time.perf_counter(), recognizer)
+                    record = {**(labels or {}), **timer.record(time.perf_counter(), recognizer)}
                     records.append(record)
                     print_transition(record, position, len(plan))
                     timer = None
@@ -688,8 +718,8 @@ def _selftest_model(recognizer: DirectionRecognizer, check: Check) -> None:
     device = next(recognizer.model.parameters()).device
     check(
         "model device",
-        device.type == "cuda",
-        f"{device}, eval mode {not recognizer.model.training}",
+        device == recognizer.device and not recognizer.model.training,
+        f"{device} (requested {recognizer.device}), eval mode {not recognizer.model.training}",
     )
 
     # Preprocessing parity: the webcam path must build the same tensor as the evaluation path.
@@ -845,10 +875,29 @@ def main() -> int:
     )
     parser.add_argument("--show", action="store_true", help="display during --benchmark")
     parser.add_argument("--selftest", action="store_true", help="headless verification")
+    parser.add_argument(
+        "--participant",
+        default="anonymous",
+        help="who is recording, stored in every row (a first name or an alias is enough)",
+    )
+    parser.add_argument(
+        "--condition",
+        default="unspecified",
+        help="the room and light, e.g. bright-room, dim-room, window-behind",
+    )
+    parser.add_argument(
+        "--device",
+        choices=DEVICE_CHOICES,
+        default="auto",
+        help="where the CNN runs: auto uses an NVIDIA GPU when present, otherwise the CPU",
+    )
     args = parser.parse_args()
 
     recognizer = DirectionRecognizer(
-        threshold=args.threshold, window=args.window, min_agreement=args.agreement
+        threshold=args.threshold,
+        window=args.window,
+        min_agreement=args.agreement,
+        device=args.device,
     )
     print(
         f"checkpoint {os.path.basename(recognizer.metadata.get('task', 'unknown'))} | "
@@ -861,11 +910,14 @@ def main() -> int:
     if args.benchmark:
         benchmark(recognizer, args.benchmark, args.show)
         return 0
+    labels = {"participant": args.participant, "condition": args.condition}
     if args.transitions:
-        transitions(recognizer, args.repeats, args.out or TRANSITIONS_CSV)
+        out = args.out or session_path("transitions", args.participant, args.condition)
+        transitions(recognizer, args.repeats, out, labels)
         return 0
     if args.idle:
-        trials(recognizer, list(NO_COMMAND_CATEGORIES), args.count, args.out or IDLE_CSV)
+        out = args.out or session_path("idle", args.participant, args.condition)
+        trials(recognizer, list(NO_COMMAND_CATEGORIES), args.count, out, labels)
         return 0
     if args.trials:
         selected = (
@@ -874,7 +926,8 @@ def main() -> int:
         unknown = [c for c in selected if c not in CATEGORIES]
         if unknown:
             parser.error(f"unknown category/categories: {unknown}; valid: {CATEGORIES}")
-        trials(recognizer, selected, args.count, args.out or TRIALS_CSV)
+        out = args.out or session_path("trials", args.participant, args.condition)
+        trials(recognizer, selected, args.count, out, labels)
         return 0
     preview(recognizer)
     return 0

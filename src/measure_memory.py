@@ -7,14 +7,16 @@ evidence that nothing grew. This measures it directly.
                 restarting on every Game Over, so rounds, deaths, popups, fruit and new games
                 are all exercised. Resident memory is sampled throughout, and tracemalloc
                 measures Python-heap growth between the end of warm-up and the end of the run.
-    recognizer  the frozen CNN on CUDA over thousands of synthetic regions of interest:
-                resident memory, and CUDA memory allocated, reserved and at peak.
+    recognizer  the frozen CNN over thousands of synthetic regions of interest, on the GPU when
+                there is one and otherwise on the CPU: resident memory, plus CUDA memory
+                allocated, reserved and at peak when it runs on the GPU.
 
 A leak shows up as steady growth after warm-up, so the verdict is on the slope, not the size.
 
 Usage:
     python -m src.measure_memory --game
     python -m src.measure_memory --recognizer
+    python -m src.measure_memory --recognizer --device cpu
 """
 
 from __future__ import annotations
@@ -129,18 +131,16 @@ def profile_game(minutes: float, seed: int) -> dict[str, Any]:
     }
 
 
-def profile_recognizer(frames: int, seed: int) -> dict[str, Any]:
+def profile_recognizer(frames: int, seed: int, device: str = "auto") -> dict[str, Any]:
     import numpy as np
     import torch
 
     from src.gesture_recognizer import DirectionRecognizer
 
-    if not torch.cuda.is_available():
-        raise SystemExit("CUDA is required: the recognizer is never profiled on the CPU")
-
     process = psutil.Process()
     before_model = rss_mb(process)
-    recognizer = DirectionRecognizer()
+    recognizer = DirectionRecognizer(device=device)
+    on_cuda = recognizer.device.type == "cuda"
     after_model = rss_mb(process)
     generator = np.random.default_rng(seed)
     pool = [
@@ -149,11 +149,12 @@ def profile_recognizer(frames: int, seed: int) -> dict[str, Any]:
 
     for index in range(RECOGNIZER_WARMUP):
         recognizer.predict_roi(pool[index % len(pool)])
-    torch.cuda.synchronize()
+    if on_cuda:
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
     gc.collect()
-    torch.cuda.reset_peak_memory_stats()
-    # The first inferences initialise the CUDA context and cuDNN, a large one-off host
-    # allocation. Recording the level after warm-up separates that from growth over time.
+    # The first inferences initialise the CUDA context and cuDNN (or the CPU kernels), a large
+    # one-off allocation. Recording the level after warm-up separates that from growth over time.
     after_warmup = rss_mb(process)
 
     samples: list[tuple[float, float]] = []
@@ -162,21 +163,27 @@ def profile_recognizer(frames: int, seed: int) -> dict[str, Any]:
         recognizer.predict_roi(pool[index % len(pool)])
         if index % RECOGNIZER_SAMPLE_EVERY == 0:
             samples.append((index / 1000.0, rss_mb(process)))
-    torch.cuda.synchronize()
+    if on_cuda:
+        torch.cuda.synchronize()
     elapsed = time.perf_counter() - started
     growth = slope(samples)
+    cuda_mb = {
+        "cuda_allocated_mb": round(torch.cuda.memory_allocated() / MB, 1) if on_cuda else None,
+        "cuda_peak_allocated_mb": round(torch.cuda.max_memory_allocated() / MB, 1)
+        if on_cuda
+        else None,
+        "cuda_reserved_mb": round(torch.cuda.memory_reserved() / MB, 1) if on_cuda else None,
+    }
     return {
         "frames": frames,
-        "device": torch.cuda.get_device_name(0),
+        "device": torch.cuda.get_device_name(0) if on_cuda else "cpu",
         "wall_seconds": round(elapsed, 1),
         "rss_before_model_mb": round(before_model, 1),
         "rss_model_loaded_mb": round(after_model, 1),
         "rss_after_warmup_mb": round(after_warmup, 1),
         "rss_end_mb": round(samples[-1][1], 1),
         "rss_growth_mb_per_1k_frames": round(growth, 3),
-        "cuda_allocated_mb": round(torch.cuda.memory_allocated() / MB, 1),
-        "cuda_peak_allocated_mb": round(torch.cuda.max_memory_allocated() / MB, 1),
-        "cuda_reserved_mb": round(torch.cuda.memory_reserved() / MB, 1),
+        **cuda_mb,
         "no_leak": growth < RECOGNIZER_RSS_LIMIT_MB_PER_1K,
     }
 
@@ -194,16 +201,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--game", action="store_true", help="profile the headless game loop")
-    target.add_argument("--recognizer", action="store_true", help="profile the CUDA recognizer")
+    target.add_argument("--recognizer", action="store_true", help="profile the recognizer")
     parser.add_argument("--minutes", type=float, default=10.0, help="simulated game minutes")
     parser.add_argument("--frames", type=int, default=5000, help="recognizer frames")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     args = parser.parse_args()
 
     if args.game:
         section, result = "game", profile_game(args.minutes, args.seed)
     else:
-        section, result = "recognizer", profile_recognizer(args.frames, args.seed)
+        result = profile_recognizer(args.frames, args.seed, args.device)
+        # CPU runs get their own section, so they never overwrite the GPU measurement.
+        section = "recognizer_cpu" if result.get("device") == "cpu" else "recognizer"
     write_report(section, result)
     for name, value in result.items():
         print(f"  {name:<42} {value}")

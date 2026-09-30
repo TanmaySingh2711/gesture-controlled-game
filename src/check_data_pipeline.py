@@ -391,8 +391,9 @@ def check_determinism(split: dict[str, Any]) -> None:
 
 
 def check_cuda(loader: DataLoader[Any]) -> None:
+    """Batches reach the GPU intact. Skipped without CUDA: the pipeline also serves the CPU."""
     if not torch.cuda.is_available():
-        record("CUDA transfer", False, "CUDA is not available")
+        print("[SKIP] CUDA transfer              no CUDA GPU - batches stay on the CPU")
         return
     device = torch.device("cuda")
     images, labels = next(iter(loader))

@@ -2,16 +2,17 @@
 
 ## Setting up
 
-Python 3.12, 64-bit, and an NVIDIA GPU with a CUDA 13 driver for the gesture application.
+Python 3.12, 64-bit. An NVIDIA GPU with a CUDA 13 driver is needed only to retrain the model;
+the application, the tests and everything else run on the CPU.
 
 ```bash
-python -m venv venv
+python install.py --dev               # venv, the right PyTorch build, dev tools, the project
 venv\Scripts\activate                 # Windows  (source venv/bin/activate elsewhere)
-pip install -r requirements.txt       # includes the CUDA build of PyTorch
-pip install -r requirements-dev.txt   # ruff, mypy, pytest, coverage, pip-audit
-pip install -e . --no-deps            # makes `game` and `src` importable everywhere
-pre-commit install                    # optional: run the quality gates on every commit
+pre-commit install                    # file checks, commit-message check, tests before push
 ```
+
+`install.py` picks `requirements.txt` (CUDA) or `requirements-cpu.txt` for you; see the README
+for the manual steps.
 
 ## Quality gates
 
@@ -20,16 +21,16 @@ Every change should pass these before it is committed. CI runs the same ones.
 ```bash
 ruff format .                      # formatting
 ruff check .                       # lint, including security and bug-prone patterns
-mypy game src tests                # static types
+mypy game src tests install.py     # static types
 pytest                             # every test, including the standalone self-test scripts
-pytest --cov=game --cov=src        # the same, with a coverage report
+pytest --cov=game --cov=src        # the same, with a coverage report (fails below 90%)
 pytest -m "not slow"               # a quick loop while editing (skips training and self-tests)
 ```
 
 `pytest` runs the self-test scripts (`game/main.py --selftest`, `check_integration.py`,
-`check_ui.py`, `check_final_application.py`, `check_dataset.py` and `environment_check.py`)
-through `tests/test_self_tests.py`, each in a fresh interpreter, since several of them assert that
-torch and cv2 were never imported. Tests needing CUDA, the dataset images or the frozen checkpoint
+`check_ui.py`, `check_final_application.py`, `check_data_pipeline.py`, `check_dataset.py` and
+`environment_check.py`) through `tests/test_self_tests.py`, each in a fresh interpreter, since
+several of them assert that torch and cv2 were never imported. Tests needing CUDA, the dataset images or the frozen checkpoint
 skip themselves when those are missing, as they are in CI.
 
 On a machine with the GPU and a webcam, also run:
@@ -54,7 +55,8 @@ These exist because the project's reported numbers depend on them:
 ## Commits
 
 Small commits, each one passing the quality gates, with a message that says what changed and
-why. A conventional prefix makes the history easy to scan:
+why. A conventional prefix makes the history easy to scan, and once `pre-commit install` has
+run, the `commit-message` hook refuses a first line without one (so "Update" is rejected):
 
 ```text
 feat: add colour-blind-safe theme

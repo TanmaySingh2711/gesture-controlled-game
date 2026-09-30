@@ -12,7 +12,7 @@ Two loops that never wait for each other:
     main thread              RecognitionWorker thread
     ------------             ------------------------
     pygame events            camera.read()
-    game.update(dt)          mirror  ->  ROI  ->  CUDA inference
+    game.update(dt)          mirror  ->  ROI  ->  CNN inference (CUDA, or the CPU)
     game.draw()              publish a snapshot into SharedState
     ~60 FPS                  ~28-31 FPS, camera limited
 
@@ -43,7 +43,7 @@ ends the worker, it is logged once, shown as CAMERA ERROR, and the keyboard keep
 Testability
 -----------
 The worker takes optional `camera_factory`, `recognizer_factory` and `mirror` callables. The
-application passes none and gets the real webcam, the CUDA model and OpenCV's flip; the test
+application passes none and gets the real webcam, the CNN and OpenCV's flip; the test
 suite passes fakes, so the real capture loop - reconnection, reset requests, shutdown and error
 reporting - runs in CI with no camera and no GPU.
 """
@@ -148,6 +148,7 @@ class Snapshot:
     status: str = "starting"
     error: str | None = None
     preview: Any = None  # small BGR ndarray, or None
+    device: str = ""  # "cuda" or "cpu" once the model is loaded, so the fallback is never silent
 
     def is_fresh(self, now: float | None = None, stale_seconds: float = STALE_SECONDS) -> bool:
         if not self.camera_ok or self.sequence == 0:
@@ -217,12 +218,14 @@ class RecognitionWorker(threading.Thread):
         recognizer_factory: Callable[[], Recognizer] | None = None,
         mirror: Callable[[Any], Any] | None = None,
         reconnect_delay: float = RECONNECT_DELAY,
+        device: str = "auto",
     ) -> None:
         super().__init__(name=name, daemon=True)
         self.state = state
         self.threshold = threshold
         self.window = window
         self.agreement = agreement
+        self.device = device
         self._camera_factory = camera_factory or _real_camera
         self._recognizer_factory = recognizer_factory or self._real_recognizer
         self._mirror = mirror or _cv2_mirror
@@ -250,6 +253,7 @@ class RecognitionWorker(threading.Thread):
             threshold=self.threshold if self.threshold is not None else DEFAULT_THRESHOLD,
             window=self.window if self.window is not None else DEFAULT_WINDOW,
             min_agreement=self.agreement if self.agreement is not None else DEFAULT_MIN_AGREEMENT,
+            device=self.device,
         )
 
     def stop(self) -> None:
@@ -314,8 +318,10 @@ class RecognitionWorker(threading.Thread):
             self.state.publish(status="loading model", camera_ok=False)
             recognizer = self._recognizer_factory()
             self.recognizer = recognizer
+            device = str(getattr(recognizer, "device", ""))
+            log.info("gesture recognition running on %s", device or "an unknown device")
 
-            self.state.publish(status="opening camera")
+            self.state.publish(status="opening camera", device=device)
             capture = self._camera_factory()
             self.state.publish(status="ready", camera_ok=True, error=None)
             self.started_at = time.perf_counter()
@@ -415,10 +421,14 @@ class GestureController:
     # --- lifecycle -----------------------------------------------------------------------
     @classmethod
     def with_worker(
-        cls, threshold: float | None = None, window: int | None = None, agreement: int | None = None
+        cls,
+        threshold: float | None = None,
+        window: int | None = None,
+        agreement: int | None = None,
+        device: str = "auto",
     ) -> GestureController:
         state = SharedState()
-        worker = RecognitionWorker(state, threshold, window, agreement)
+        worker = RecognitionWorker(state, threshold, window, agreement, device=device)
         return cls(state, worker)
 
     def start(self) -> None:

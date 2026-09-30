@@ -1,0 +1,134 @@
+{
+ "source": "dataset_external/ - 2,000 unseen-subject HaGRID crops, frozen model",
+ "rules": [
+  "measurement only: nothing trained, no setting tuned from these numbers",
+  "the P3 test split is never touched",
+  "corruptions are deterministic; noise is seeded per image"
+ ],
+ "live_threshold": 0.9,
+ "clean_accuracy": 0.996,
+ "worst_condition": "heavy sensor noise (sigma 30)",
+ "worst_accuracy": 0.586,
+ "conditions": [
+  {
+   "condition": "clean",
+   "group": "reference",
+   "images": 2000,
+   "accuracy": 0.996,
+   "accepted_at_0.90": 0.9835,
+   "wrong_and_accepted_at_0.90": 0.0005
+  },
+  {
+   "condition": "dim light (brightness x0.4)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.994,
+   "accepted_at_0.90": 0.954,
+   "wrong_and_accepted_at_0.90": 0.0005
+  },
+  {
+   "condition": "dark room (brightness x0.25)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.981,
+   "accepted_at_0.90": 0.909,
+   "wrong_and_accepted_at_0.90": 0.0015
+  },
+  {
+   "condition": "harsh light (brightness x1.6)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.94,
+   "accepted_at_0.90": 0.8745,
+   "wrong_and_accepted_at_0.90": 0.0125
+  },
+  {
+   "condition": "flat light (contrast x0.5)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.994,
+   "accepted_at_0.90": 0.966,
+   "wrong_and_accepted_at_0.90": 0.001
+  },
+  {
+   "condition": "warm light (tungsten cast)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.9905,
+   "accepted_at_0.90": 0.9685,
+   "wrong_and_accepted_at_0.90": 0.002
+  },
+  {
+   "condition": "cool light (blue cast)",
+   "group": "lighting",
+   "images": 2000,
+   "accuracy": 0.99,
+   "accepted_at_0.90": 0.9675,
+   "wrong_and_accepted_at_0.90": 0.0005
+  },
+  {
+   "condition": "slight blur (radius 1.5)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.984,
+   "accepted_at_0.90": 0.9045,
+   "wrong_and_accepted_at_0.90": 0.001
+  },
+  {
+   "condition": "strong blur (radius 3)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.767,
+   "accepted_at_0.90": 0.62,
+   "wrong_and_accepted_at_0.90": 0.0535
+  },
+  {
+   "condition": "sensor noise (sigma 15)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.9425,
+   "accepted_at_0.90": 0.8825,
+   "wrong_and_accepted_at_0.90": 0.0105
+  },
+  {
+   "condition": "heavy sensor noise (sigma 30)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.586,
+   "accepted_at_0.90": 0.542,
+   "wrong_and_accepted_at_0.90": 0.1235
+  },
+  {
+   "condition": "cheap webcam JPEG (quality 15)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.9835,
+   "accepted_at_0.90": 0.943,
+   "wrong_and_accepted_at_0.90": 0.0025
+  },
+  {
+   "condition": "low resolution (48 px)",
+   "group": "camera",
+   "images": 2000,
+   "accuracy": 0.9785,
+   "accepted_at_0.90": 0.9195,
+   "wrong_and_accepted_at_0.90": 0.0015
+  },
+  {
+   "condition": "tilted hand (+20 degrees)",
+   "group": "pose",
+   "images": 2000,
+   "accuracy": 0.986,
+   "accepted_at_0.90": 0.955,
+   "wrong_and_accepted_at_0.90": 0.003
+  },
+  {
+   "condition": "tilted hand (-20 degrees)",
+   "group": "pose",
+   "images": 2000,
+   "accuracy": 0.987,
+   "accepted_at_0.90": 0.9625,
+   "wrong_and_accepted_at_0.90": 0.0035
+  }
+ ]
+}

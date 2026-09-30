@@ -14,7 +14,7 @@ they came from a hand or a keyboard.
 flowchart LR
     subgraph worker["Recognition worker thread (~30 FPS)"]
         cam[Webcam] --> mirror[Mirror frame] --> roi[300x300 ROI]
-        roi --> cnn[MobileNetV2 on CUDA] --> thr[Threshold 0.90] --> smooth[3-of-5 smoothing]
+        roi --> cnn[MobileNetV2, CUDA or CPU] --> thr[Threshold 0.90] --> smooth[3-of-5 smoothing]
     end
     smooth -- publish --> slot[(SharedState: one immutable snapshot)]
     subgraph main["Main thread (60 FPS)"]
@@ -77,7 +77,7 @@ older than 0.75 s is ignored entirely, so a dead worker cannot leave an old dire
 | Setting | Value | Evidence |
 |---|---|---|
 | Confidence threshold | 0.90 | Live trials: intentional gestures never below 0.961, idle and absent hands never above 0.617 |
-| Smoothing | 3 of 5 frames | Caught the offline `down`-read-as-`up` at 0.903 that a threshold alone cannot; 0/6 spurious turns at natural speed |
+| Smoothing | 3 of 5 frames | Caught the offline `down`-read-as-`up` at 0.903 that a threshold alone cannot; live gesture changes passed through a wrong command in 0 of 6 (published run) and 2 of 12 (first attempt) |
 | Turn buffer | 0.35 s | Covers the measured 217 ms p95 command latency plus about 130 ms of human timing error |
 | Stale timeout | 0.75 s | Just over twenty camera frames: rides out hiccups, notices a dead thread quickly |
 | Player speed | 6.2 tiles/s | Ghosts are capped below it, including the Chaser's end-of-round surge, so the game stays fair at gesture latency |
@@ -86,7 +86,8 @@ older than 0.75 s is ignored entirely, so a dead worker cannot leave an old dire
 
 | Failure | What happens |
 |---|---|
-| Model cannot load (no CUDA, wrong or tampered checkpoint) | Reported once as `CAMERA ERROR`; the keyboard keeps working |
+| No NVIDIA GPU | The recognizer runs on the CPU instead, logged once at start-up |
+| Model cannot load (wrong or tampered checkpoint) | Reported once as `CAMERA ERROR`; the keyboard keeps working |
 | Webcam stops delivering frames | Reopened up to three times with a pause between attempts, showing `RECONNECTING`; then `CAMERA ERROR` |
 | No audio device | Sound effects become silent no-ops, logged once |
 | Corrupt profile file | Defaults are loaded; saves are atomic |
@@ -102,6 +103,7 @@ Both long-running parts were profiled with `src/measure_memory.py`, and the resu
 |---|---|---|
 | Game loop, keyboard, headless | 36 MB for Python and pygame, 47 MB with the game running; torch and cv2 never loaded | +0.004 MB per minute over 10 simulated minutes and 11 games, Python heap +0.04 MB |
 | Recognizer, frozen model on CUDA | +118 MB to load the model, +275 MB once for CUDA/cuDNN set-up on the first frames | 1,034 MB to 1,026 MB over 5,000 frames; GPU: 17 MB allocated, 22 MB peak, 32 MB reserved of 4 GB |
+| Recognizer, frozen model on the CPU | +24 MB to load the model, +24 MB once on the first frames | 671 MB to 671 MB over 5,000 frames (+0.07 MB per 1,000 frames) |
 
 Nothing in a session can grow without bound, because every buffer has a fixed size:
 - The smoothing window holds five frames.

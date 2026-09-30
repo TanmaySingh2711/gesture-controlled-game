@@ -147,7 +147,10 @@ def run_epoch(
             if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
 
-            with torch.amp.autocast("cuda", dtype=torch.float16):
+            # float16 autocast on CUDA; on the CPU (used only by the tests) plain float32.
+            with torch.amp.autocast(
+                device.type, dtype=torch.float16, enabled=device.type == "cuda"
+            ):
                 outputs = model(images)
                 loss = criterion(outputs, labels)
 
@@ -273,12 +276,21 @@ class StageContext:
     batch_size: int
 
 
+def peak_memory_mb(device: torch.device) -> float:
+    """Peak CUDA memory in MB; 0.0 on the CPU, which has no such counter."""
+    return torch.cuda.max_memory_allocated() / 1024**2 if device.type == "cuda" else 0.0
+
+
 def _print_environment(device: torch.device, batch_size: int) -> None:
     print(f"PyTorch        : {torch.__version__}")
     print(f"CUDA runtime   : {torch.version.cuda}")
-    print(f"Device         : {torch.cuda.get_device_name(0)} ({device})")
-    print(f"VRAM total     : {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
-    print(f"VRAM allocated : {torch.cuda.memory_allocated() / 1024**2:.1f} MB (before model)")
+    if device.type == "cuda":
+        print(f"Device         : {torch.cuda.get_device_name(0)} ({device})")
+        total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"VRAM total     : {total:.2f} GB")
+        print(f"VRAM allocated : {torch.cuda.memory_allocated() / 1024**2:.1f} MB (before model)")
+    else:
+        print(f"Device         : {device}")
     print(f"Seed           : {SEED} | batch size {batch_size} | input {IMAGE_SIZE}x{IMAGE_SIZE}")
     print("-" * 78)
 
@@ -345,7 +357,7 @@ def _run_stage(context: StageContext, run: TrainingRun, stage: str, epochs: int,
             f"  Train Loss {train_loss:.4f}  Train Acc {train_acc:.4f}"
             f"  |  Val Loss {val_loss:.4f}  Val Acc {val_acc:.4f}"
             f"  |  lr {current_lr:.1e}  {elapsed:.1f}s"
-            f"  peak {torch.cuda.max_memory_allocated() / 1024**2:.0f} MB"
+            f"  peak {peak_memory_mb(context.device):.0f} MB"
             f"{'  *best' if improved else ''}"
         )
 
@@ -405,9 +417,12 @@ def _write_history(
         )
 
 
-def train(batch_size: int) -> tuple[dict[str, Any], int]:
-    """The P4 two-stage transfer-learning run. The test split is never loaded."""
-    device = torch.device("cuda")
+def train(batch_size: int, device: torch.device | None = None) -> tuple[dict[str, Any], int]:
+    """The P4 two-stage transfer-learning run. The test split is never loaded.
+
+    `device` defaults to CUDA, where the real model is trained; the tests pass the CPU.
+    """
+    device = device or torch.device("cuda")
     set_seed()
     _print_environment(device, batch_size)
 
@@ -419,7 +434,7 @@ def train(batch_size: int) -> tuple[dict[str, Any], int]:
         f"val batches {len(val_loader)} ({len(cast(Sized, val_loader.dataset))} images)"
     )
 
-    scaler = torch.amp.GradScaler("cuda")
+    scaler = torch.amp.GradScaler(device.type, enabled=device.type == "cuda")
     print(f"AMP enabled    : {scaler.is_enabled()} (float16 autocast on CUDA)")
     context = StageContext(
         build_model().to(device),
@@ -441,7 +456,7 @@ def train(batch_size: int) -> tuple[dict[str, Any], int]:
     ):
         _run_stage(context, run, stage, epochs, lr)
     total_time = time.time() - started
-    peak_mb = torch.cuda.max_memory_allocated() / 1024**2
+    peak_mb = peak_memory_mb(device)
 
     # The in-memory model is whatever the last epoch produced, which after early stopping is not
     # the selected one. Reload the best checkpoint - written by this very run, so it has no
@@ -476,7 +491,10 @@ def validation_breakdown(model: nn.Module, loader: DataLoader[Any], device: torc
     """
     model.eval()
     confusion = np.zeros((NUM_CLASSES, NUM_CLASSES), dtype=int)
-    with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.float16):
+    with (
+        torch.no_grad(),
+        torch.amp.autocast(device.type, dtype=torch.float16, enabled=device.type == "cuda"),
+    ):
         for batch_images, labels in loader:
             images = batch_images.to(device, non_blocking=True)
             predicted = model(images).argmax(dim=1).cpu()
@@ -570,11 +588,11 @@ def plot_curves(history: list[dict[str, Any]], best: dict[str, Any]) -> None:
     print(f"curves     {os.path.relpath(CURVES_PATH, PROJECT_ROOT)}")
 
 
-def verify_checkpoint(batch_size: int) -> bool:
+def verify_checkpoint(batch_size: int, device: torch.device | None = None) -> bool:
     """Rebuild the architecture from scratch, load the checkpoint, run one val batch."""
     print("-" * 78)
     print("checkpoint verification")
-    device = torch.device("cuda")
+    device = device or torch.device("cuda")
 
     # Goes through the guard, so a mapping mismatch fails here rather than silently.
     # A just-trained checkpoint has no pinned digest; the mapping guard still applies.
@@ -602,12 +620,15 @@ def verify_checkpoint(batch_size: int) -> bool:
     _, val_loader, _ = get_dataloaders(batch_size=batch_size)
     images, _labels = next(iter(val_loader))
     images = images.to(device, non_blocking=True)
-    with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.float16):
+    with (
+        torch.no_grad(),
+        torch.amp.autocast(device.type, dtype=torch.float16, enabled=device.type == "cuda"),
+    ):
         outputs = fresh(images)
 
     shape_ok = outputs.shape == (images.shape[0], NUM_CLASSES)
     finite = bool(torch.isfinite(outputs).all())
-    on_cuda = outputs.device.type == "cuda"
+    on_device = outputs.device.type == device.type
     ok = mapping_ok and not retired
     print(
         f"  [{'PASS' if shape_ok else 'FAIL'}] output shape {tuple(outputs.shape)} "
@@ -617,9 +638,9 @@ def verify_checkpoint(batch_size: int) -> bool:
         f"  [{'PASS' if finite else 'FAIL'}] finite outputs, range "
         f"[{outputs.min().item():.3f}, {outputs.max().item():.3f}]"
     )
-    print(f"  [{'PASS' if on_cuda else 'FAIL'}] model output on {outputs.device}")
+    print(f"  [{'PASS' if on_device else 'FAIL'}] model output on {outputs.device}")
 
-    return shape_ok and finite and on_cuda and ok
+    return shape_ok and finite and on_device and ok
 
 
 def main() -> int:

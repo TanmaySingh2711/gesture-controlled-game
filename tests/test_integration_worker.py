@@ -130,6 +130,19 @@ def test_worker_publishes_the_latest_result_and_stops_cleanly() -> None:
     assert not worker.failed
 
 
+def test_the_processor_running_the_cnn_is_published() -> None:
+    """So the panel can show "cpu" or "gpu": a fall-back from the GPU is never silent."""
+    state = SharedState()
+    fake = FakeRecognizer("left")
+    fake.device = "cpu"  # type: ignore[attr-defined]
+    worker = make_worker(state, cameras(ScriptedCamera()), fake)
+    controller = GestureController(state, worker)
+    controller.start()
+    assert wait_for(lambda: state.read().sequence >= 1)
+    assert controller.stop()
+    assert state.read().device == "cpu"
+
+
 def test_reset_request_reaches_the_recognizer() -> None:
     state = SharedState()
     recognizer = FakeRecognizer()

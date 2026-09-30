@@ -22,6 +22,7 @@ from src.play_gesture import (
     command_text,
     confidence_text,
     control_status,
+    diagnostics_text,
     loading_text,
     main,
     positive_int,
@@ -153,6 +154,16 @@ def test_every_panel_string_fits_inside_the_panel(app: GesturePacman, theme_name
                 assert app.command_font.size(headline)[0] <= INNER_WIDTH, headline
                 health = control_status(shown, fresh, True)
                 assert app.font.size(health)[0] <= INNER_WIDTH, health
+
+
+@pytest.mark.parametrize(("device", "shown"), [("cuda:0", " gpu "), ("cpu", " cpu "), ("", "ms ")])
+def test_the_small_print_names_the_processor_and_fits_the_panel(
+    app: GesturePacman, device: str, shown: str
+) -> None:
+    snapshot = Snapshot(raw_direction="right", inference_ms=99.9, device=device)
+    line = diagnostics_text(snapshot, 999.9)
+    assert shown in line
+    assert app.small.size(line)[0] <= INNER_WIDTH, line
 
 
 def test_static_text_is_rebuilt_only_when_the_theme_changes(app: GesturePacman) -> None:

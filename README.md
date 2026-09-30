@@ -1,5 +1,7 @@
 # CNN Gesture Controlled Pac-Man
 
+[![CI](https://github.com/TanmaySingh2711/gesture-controlled-game/actions/workflows/ci.yml/badge.svg)](https://github.com/TanmaySingh2711/gesture-controlled-game/actions/workflows/ci.yml)
+
 A Pac-Man-style maze game you steer with your hand. A MobileNetV2 CNN recognises four gestures from
 a webcam in real time, and the game turns them into moves.
 
@@ -11,9 +13,13 @@ a webcam in real time, and the game turns them into moves.
 | Thumbs down | **DOWN** |
 
 ```bash
+python install.py                       # one-time setup: venv, libraries, project, self-check
 python src/play_gesture.py              # play with gestures (the keyboard still works)
-python src/play_gesture.py --no-camera  # keyboard only, no webcam or GPU needed
+python src/play_gesture.py --no-camera  # keyboard only, no webcam needed
 ```
+
+No NVIDIA GPU is needed: the model runs on the CPU in about 12 ms per frame, well inside the
+webcam's 33 ms frame interval.
 
 ## At a glance
 
@@ -23,11 +29,13 @@ python src/play_gesture.py --no-camera  # keyboard only, no webcam or GPU needed
 | Unseen people | **99.6%** (1,992/2,000) from 1,727 people with no image in the dataset, 95% interval 99.2%-99.8% |
 | Calibration | expected calibration error **0.005** - confidence can be taken at face value |
 | Live recognition | threshold 0.90 and 3-of-5 smoothing, both frozen from webcam trials |
-| Live performance | game **60 FPS** beside a **30 FPS** recogniser, no backlog over a 330 s run |
-| Command latency | **143 ms** mean from a gesture being seen to a stable command |
-| Memory | game **47 MB**, flat over 10 simulated minutes; recognizer **22 MB** GPU peak, no growth over 5,000 frames |
-| Automated tests | pytest suite plus four self-test scripts, run in CI on every push |
-| Known limitation | no reject class: a deliberate unsupported gesture (e.g. a peace sign) can be read as a direction - use only the four |
+| Live performance | game **60 FPS** beside a **30 FPS** recogniser, no backlog over a 330 s run (GPU) |
+| Runs without a GPU | CPU fallback: **12 ms** per frame, same predictions as the GPU on all 200 validation images |
+| Changing gesture | from starting to move the hand to a stable new command: **1.3 s** median in the published run (0.8-1.6 s), **2.9 s** in an earlier attempt (1.1-15 s); **143 ms** of it is the recognizer's own decision time, the rest is the hand moving |
+| Memory | game **47 MB**, flat over 10 simulated minutes; recognizer **22 MB** GPU peak, no growth over 5,000 frames on GPU or CPU |
+| Automated tests | 470+ pytest tests and the self-test scripts; **94% coverage** (lines and branches) without a GPU or the dataset, and CI fails below 90% |
+| Camera conditions | 97.9-99.4% under dim light, colour casts, JPEG, low resolution and a tilted hand; drops to 94% with harsh light, 77% with strong blur and 59% with heavy dark-room noise (simulated, [MODEL_CARD.md](docs/MODEL_CARD.md#robustness-to-simulated-camera-conditions)) |
+| Known limitations | no reject class: a deliberate unsupported gesture (e.g. a peace sign) can be read as a direction - use only the four. Play in a lit room: webcam noise in the dark causes confident misreads |
 
 Status: the project passed final testing and manual acceptance ([FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md)).
 A later quality round added accessibility, security hardening, statistical rigour, a proper test
@@ -51,20 +59,37 @@ turn is taken when it becomes possible.
 
 ## Setup
 
-Python 3.12 (64-bit) and an NVIDIA GPU with a CUDA 13 driver for gesture control. The keyboard game
-needs neither.
+Python 3.12 (64-bit). A webcam for gesture control. An NVIDIA GPU is optional.
+
+```bash
+python install.py          # players
+python install.py --dev    # developers: also the test, lint and type-check tools
+```
+
+`install.py` creates `venv/`, installs the CUDA build of PyTorch (`requirements.txt`) when it finds
+an NVIDIA GPU and the CPU build (`requirements-cpu.txt`) otherwise, installs the project, and runs
+`src/environment_check.py`, which loads the real model and times a frame on your machine. After
+moving the project folder, run `python install.py --fresh`: a venv keeps pointing at the folder it
+was created in, and the installer says so instead of letting commands fail mysteriously. On
+Windows it also stops early, with the fix, if the folder's path is too long for PyTorch to install.
+
+The recognizer uses the GPU when there is one and the CPU otherwise; `--device cpu` or
+`--device cuda` on `play_gesture.py` and `realtime_gesture.py` forces one. Only retraining the
+model (`src/train_model.py`) requires CUDA.
+
+<details>
+<summary>Manual setup</summary>
 
 ```bash
 python -m venv venv
 venv\Scripts\activate                 # Windows  (source venv/bin/activate elsewhere)
-pip install -r requirements.txt       # includes the CUDA build of PyTorch
+pip install -r requirements.txt       # NVIDIA GPU (CUDA build);  or: -r requirements-cpu.txt
 pip install -r requirements-dev.txt   # testing and quality tools
 pip install -e . --no-deps            # makes the `game` and `src` packages importable
-python src/environment_check.py       # verifies Python, libraries, CUDA and the webcam
+python src/environment_check.py       # verifies Python, libraries, the model and the webcam
 ```
 
-`requirements.txt` carries the PyTorch CUDA index, so it installs the GPU build; plain-PyPI `torch`
-is CPU-only on Windows and is not supported for the application.
+</details>
 
 ## Architecture
 
@@ -134,7 +159,7 @@ never loaded during training and was evaluated exactly once.
 | Calibration | ECE 0.005, Brier score 0.016, NLL 0.029 |
 | At the live 0.90 threshold | 98% of test images accepted, 99.5% of those correct |
 | Errors | `right` read as `down` (conf 0.60), `down` read as `up` (conf 0.90) |
-| GPU latency, batch 1 | 6.0 ms mean |
+| GPU latency, batch 1 | 6.0 ms mean (CPU: about 12 ms per webcam frame, preprocessing included) |
 
 The two errors are exactly why smoothing exists: the confident `down`-as-`up` passes the threshold,
 but a single frame cannot win a 3-of-5 vote.
@@ -166,14 +191,30 @@ one. See [docs/MODEL_STUDY.md](docs/MODEL_STUDY.md).
 | Smoothing | 3 of 5 frames | Stops a single confident wrong frame from turning Pac-Man |
 | ROI | 300 x 300 of a mirrored 640 x 480 frame | Matches how the training crops were built |
 
-Live trials: 80/80 held gestures, 0/40 false commands from idle or absent hands, 0/6 wrong turns in
-natural-speed transitions.
+Live trials, one webcam and one room (how many people took part was not recorded):
+
+| Trial | Result |
+|---|---|
+| Held gestures | 80/80 recognised |
+| Idle or absent hand | 0/40 false commands |
+| Gesture changes, published run | 6 changes: none passed through a wrong command; 0.8-1.6 s each |
+| Gesture changes, first attempt | 12 changes, 4 minutes earlier with the same settings: **2 passed through a wrong command** on the way (right->up briefly gave DOWN, left->right briefly gave UP), and 6 took over 3 s (up to 15 s) |
+
+Both transition runs are kept in `model/` (`live_direction_transitions.csv` and
+`live_direction_transitions_firstattempt.csv`). Taken together, 2 of 18 changes briefly issued a
+wrong command, so a wrong turn during a quick change is possible, if uncommon.
 
 ```bash
 python src/realtime_gesture.py              # live preview with overlay
 python src/realtime_gesture.py --selftest   # checks against the real camera
 python src/realtime_gesture.py --trials     # guided trial recorder
+python src/realtime_gesture.py --trials --participant NAME --condition dim-room   # label a session
+python -m src.live_report --include-p6      # every session, per person and per room
 ```
+
+Sessions are saved to `reports/live_sessions/`, one file each, and never overwrite the P6 records.
+[MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md#6-recording-evidence-with-several-people-and-rooms)
+has the protocol for testing with several people and rooms.
 
 ## Security
 
@@ -202,12 +243,13 @@ The split is 1600/200/200, stratified with seed 42, and reproducible byte for by
 ```bash
 pytest                               # every test, including the self-test scripts; GPU, webcam and
                                      # dataset tests skip themselves when those are absent
-pytest --cov=game --cov=src          # with coverage
+pytest --cov=game --cov=src          # with coverage (fails below 90%)
 pytest -m "not slow"                 # quick loop while editing
 ruff format . && ruff check .        # formatting and lint
-mypy game src tests                  # static types
+mypy game src tests install.py       # static types
 python -m src.measure_memory --game  # memory profile (--recognizer for the CUDA model)
 python -m src.evaluate_external      # frozen model on unseen people (after the lineage audit)
+python -m src.evaluate_robustness    # the same people under simulated lighting, blur and noise
 ```
 
 CI runs formatting, lint, types, the test suite and a dependency audit on every push. See
@@ -238,7 +280,8 @@ gesture-controlled-game/
 ├── model/                    # the frozen checkpoint and its training and evaluation records
 ├── dataset/                  # 500 images per class (images not tracked in git)
 ├── archive/                  # retired scripts, kept for the record
-├── pyproject.toml  requirements.txt  requirements-dev.txt
+├── install.py                # one-command setup
+├── pyproject.toml  requirements.txt  requirements-cpu.txt  requirements-dev.txt
 ├── README.md  CHANGELOG.md  CONTRIBUTING.md  SECURITY.md
 └── PROJECT_SPEC.md  FINAL_TEST_REPORT.md
 ```

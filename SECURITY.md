@@ -33,8 +33,10 @@ two moving together.
 ## Dependency audit
 
 `pip-audit` reported **no known vulnerabilities** in the installed environment. The CUDA builds
-of `torch` and `torchvision` come from the PyTorch index rather than PyPI, so `pip-audit` cannot
-look them up. As a partial check, the same version numbers were audited against the PyPI
+of `torch` and `torchvision` (`requirements.txt`) and their CPU builds (`requirements-cpu.txt`)
+come from the PyTorch index rather than PyPI, so `pip-audit` cannot look them up. That index also
+supplies PyTorch's own dependencies, including an old `setuptools`; `requirements-dev.txt` pins a
+patched one from PyPI. As a partial check, the same version numbers were audited against the PyPI
 advisory database, also with no known vulnerabilities:
 
 ```bash

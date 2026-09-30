@@ -50,7 +50,7 @@ jobs:
         run: ruff check .
 
       - name: Static types
-        run: mypy game src tests
+        run: mypy game src tests install.py
 
       # Includes the standalone self-test scripts (tests/test_self_tests.py), each in a fresh
       # interpreter, with their coverage measured through coverage's subprocess patch.

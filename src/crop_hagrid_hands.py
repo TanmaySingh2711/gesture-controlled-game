@@ -316,9 +316,13 @@ def crop_class(
     run: CropRun,
     label: str,
     order: list[tuple[str, str, list[float]]],
-    output_dir: str = CROPPED_DIR,
+    output_dir: str | None = None,
 ) -> None:
-    """Walk one class's candidates in order until `run.target` crops are written."""
+    """Walk one class's candidates in order until `run.target` crops are written.
+
+    `output_dir` defaults to CROPPED_DIR, looked up when called rather than when defined.
+    """
+    output_dir = output_dir or CROPPED_DIR
     run.counts[label] = 0
     run.skipped[label] = dict.fromkeys(SKIP_REASONS, 0)
     run.sizes[label] = []
@@ -405,7 +409,8 @@ def print_plan(selected: list[str], target: int) -> None:
     print("-" * 78)
 
 
-def clear_output(selected: list[str], output_dir: str = CROPPED_DIR) -> None:
+def clear_output(selected: list[str], output_dir: str | None = None) -> None:
+    output_dir = output_dir or CROPPED_DIR
     for label in selected:
         folder = os.path.join(output_dir, label)
         os.makedirs(folder, exist_ok=True)

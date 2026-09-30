@@ -66,6 +66,38 @@ odd - a failure with a note is far more useful than a tick without one.
 | 5.4 | Quit with ESC during play | Window closes promptly with no error | |
 | 5.5 | Quit with the window close button | Same | |
 | 5.6 | Quit from the start screen | Same | |
+| 5.7 | `python src/play_gesture.py --device cpu` | Plays with gestures; the panel's small print reads `cpu`, and its `fps` stays near 60 | |
+
+## 6. Recording evidence with several people and rooms
+
+The project's live numbers so far come from one webcam in one room, and nobody recorded how many
+people took part. This protocol turns "it works for me" into evidence. Each session takes about
+five minutes per person per room.
+
+**Who:** at least 5 people, with different hand sizes and skin tones if you can. **Where:** at
+least 3 conditions, for example `bright-room`, `dim-room` (one lamp) and `window-behind` (light
+behind the player). Use short, consistent condition names, since they become the report's groups.
+
+For each person, in each condition:
+
+```bash
+python src/realtime_gesture.py --trials --count 10 --participant NAME --condition ROOM
+python src/realtime_gesture.py --idle --count 10 --participant NAME --condition ROOM
+python src/realtime_gesture.py --transitions --repeats 2 --participant NAME --condition ROOM
+```
+
+Each command writes a new file to `reports/live_sessions/`; nothing overwrites an earlier session
+or the P6 records in `model/`. Afterwards:
+
+```bash
+python -m src.live_report --include-p6
+```
+
+This prints and saves (`reports/live_summary.json`) held-gesture accuracy, false commands and
+gesture changes that passed through a wrong command, per person, per room and overall, each
+with a 95% interval. Commit the session files with the summary, so every number stays traceable
+to its recording. Report the results as they come out, including the bad ones: a room where
+accuracy drops is exactly what the next improvement needs to know.
 
 ## Sign-off
 

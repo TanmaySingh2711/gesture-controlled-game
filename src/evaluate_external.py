@@ -31,7 +31,7 @@ from torch.utils.data import DataLoader
 
 from src import analyze_evaluation as rigor
 from src.data_pipeline import CLASS_TO_INDEX, GestureDataset, eval_transform
-from src.evaluate_model import BATCH_SIZE, evaluate, load_model, require_cuda, write_predictions
+from src.evaluate_model import BATCH_SIZE, evaluate, load_model, write_predictions
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 EXTERNAL_DIR: Final = PROJECT_ROOT / "dataset_external"
@@ -59,9 +59,14 @@ def md5_of(path: Path) -> str:
 
 
 def duplicates_of_dataset(
-    entries: list[dict[str, Any]], root: Path = PROJECT_ROOT, dataset_dir: Path = DATASET_DIR
+    entries: list[dict[str, Any]], root: Path | None = None, dataset_dir: Path | None = None
 ) -> list[str]:
-    """External images whose bytes also appear in `dataset/` - there must be none."""
+    """External images whose bytes also appear in `dataset/` - there must be none.
+
+    The folders default to PROJECT_ROOT and DATASET_DIR, looked up when called.
+    """
+    root = root or PROJECT_ROOT
+    dataset_dir = dataset_dir or DATASET_DIR
     dataset = {md5_of(path) for path in dataset_dir.rglob("*.jpg")}
     return [entry["path"] for entry in entries if md5_of(root / entry["path"]) in dataset]
 
@@ -118,8 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    require_cuda()
-    device = torch.device("cuda")
+    # The GPU when there is one; the CPU gives the same predictions (checked in the tests).
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, _payload = load_model(device)
     loader = DataLoader(
         GestureDataset(entries, eval_transform()),

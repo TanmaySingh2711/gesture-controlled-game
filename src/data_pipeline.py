@@ -41,7 +41,7 @@ Real-time webcam inference MUST use exactly the evaluation preprocessing below, 
       -> to float tensor scaled to [0, 1]
       -> normalize with the ImageNet mean/std below
       -> add a batch dimension -> 1 x 3 x 160 x 160
-      -> move to CUDA
+      -> move to the inference device (CUDA when present, otherwise the CPU)
 
 Never apply training augmentation at inference time.
 """

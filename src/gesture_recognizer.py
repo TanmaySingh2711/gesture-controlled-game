@@ -80,6 +80,12 @@ DEFAULT_THRESHOLD: Final = 0.90
 DEFAULT_WINDOW: Final = 5
 DEFAULT_MIN_AGREEMENT: Final = 3
 
+# The CPU is a full fallback, not a degraded mode: MobileNetV2 at 160x160 takes about 12 ms per
+# frame on four CPU threads, well inside the webcam's ~33 ms frame interval. Four threads leave
+# the rest of the machine to the game loop.
+DEVICE_CHOICES: Final = ("auto", "cuda", "cpu")
+CPU_THREADS: Final = 4
+
 DIRECTION_HELP: Final[dict[str, str]] = {
     "left": "Fist",
     "right": "Open palm",
@@ -91,6 +97,22 @@ DIRECTION_HELP: Final[dict[str, str]] = {
 def label_of(command: str | None) -> str:
     """Display text for a command that may be None."""
     return NO_COMMAND_LABEL if command is None else command.upper()
+
+
+def select_device(preference: str = "auto") -> torch.device:
+    """The device recognition runs on: CUDA when present, otherwise the CPU.
+
+    `auto` prefers CUDA and falls back to the CPU; `cuda` insists on the GPU and fails loudly
+    without one; `cpu` never touches the GPU, even when there is one.
+    """
+    if preference not in DEVICE_CHOICES:
+        raise ValueError(f"device must be one of {', '.join(DEVICE_CHOICES)}, got {preference!r}")
+    if preference == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("--device cuda was requested, but no CUDA GPU is available.")
+    if preference != "cpu" and torch.cuda.is_available():
+        return torch.device("cuda")
+    torch.set_num_threads(min(CPU_THREADS, os.cpu_count() or 1))
+    return torch.device("cpu")
 
 
 @dataclass
@@ -114,14 +136,13 @@ class DirectionRecognizer:
         threshold: float = DEFAULT_THRESHOLD,
         window: int = DEFAULT_WINDOW,
         min_agreement: int = DEFAULT_MIN_AGREEMENT,
+        device: str = "auto",
     ) -> None:
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA GPU is required for CNN inference.")
         if not 0.0 < threshold <= 1.0:
             raise ValueError(f"threshold must be in (0, 1], got {threshold}")
         if not 1 <= min_agreement <= window:
             raise ValueError(f"min_agreement {min_agreement} must be between 1 and window {window}")
-        self.device = torch.device("cuda")
+        self.device = select_device(device)
         self.threshold = threshold
         self.window = window
         self.min_agreement = min_agreement
@@ -175,7 +196,7 @@ class DirectionRecognizer:
 
     # --- inference -----------------------------------------------------------------------
     def preprocess(self, roi_bgr: Frame) -> torch.Tensor:
-        """BGR ROI -> 1x3x160x160 CUDA tensor, via the frozen evaluation transform.
+        """BGR ROI -> 1x3x160x160 tensor on the recognizer's device, via the evaluation transform.
 
         The frame is already mirrored by the caller before the ROI is cut; nothing here flips,
         rotates or jitters it. Augmentation belongs to training only.
@@ -190,7 +211,8 @@ class DirectionRecognizer:
             logits = self.model(self.preprocess(roi_bgr))  # raw logits, no softmax inside
             probabilities = torch.softmax(logits, dim=1)  # softmax only for confidence
             confidence, index = probabilities.max(dim=1)
-            torch.cuda.synchronize()
+            if self.device.type == "cuda":
+                torch.cuda.synchronize()  # so the timing covers the GPU work, not just the launch
         self._last_inference_ms = (time.perf_counter() - started) * 1000.0
 
         raw_direction = INDEX_TO_DIRECTION[int(index.item())]

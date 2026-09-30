@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CHECKPOINT = ROOT / "model" / "best_direction_model.pt"
 HAS_DATASET = any((ROOT / "dataset").rglob("*.jpg"))
 
-# check_data_pipeline.py is deliberately absent: every run regenerates its augmentation sample
-# sheets in the project root, which would dirty the working tree on each test run.
+# check_data_pipeline.py regenerates its augmentation sample sheets on every run; they go to
+# reports/qa/, which is gitignored, so running it here leaves the working tree clean.
 SCRIPTS = [
     pytest.param(["game/main.py", "--selftest"], id="game-rules"),
     pytest.param(["src/check_integration.py"], id="integration"),
@@ -29,13 +29,17 @@ SCRIPTS = [
         marks=pytest.mark.skipif(not CHECKPOINT.exists(), reason="frozen checkpoint not present"),
     ),
     pytest.param(
+        ["src/check_data_pipeline.py", "--workers", "0"],
+        id="data-pipeline",
+        marks=pytest.mark.skipif(not HAS_DATASET, reason="dataset images are not tracked in git"),
+    ),
+    pytest.param(
         ["src/check_dataset.py"],
         id="dataset",
         marks=pytest.mark.skipif(not HAS_DATASET, reason="dataset images are not tracked in git"),
     ),
-    pytest.param(
-        ["src/environment_check.py", "--skip-webcam"], id="environment", marks=pytest.mark.gpu
-    ),
+    # No GPU mark: without CUDA the check runs the model on the CPU, as a player's machine would.
+    pytest.param(["src/environment_check.py", "--skip-webcam"], id="environment"),
 ]
 
 

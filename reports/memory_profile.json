@@ -26,5 +26,19 @@
     "cuda_peak_allocated_mb": 22.2,
     "cuda_reserved_mb": 32.0,
     "no_leak": true
+  },
+  "recognizer_cpu": {
+    "frames": 5000,
+    "device": "cpu",
+    "wall_seconds": 78.8,
+    "rss_before_model_mb": 622.8,
+    "rss_model_loaded_mb": 647.0,
+    "rss_after_warmup_mb": 671.4,
+    "rss_end_mb": 670.8,
+    "rss_growth_mb_per_1k_frames": 0.072,
+    "cuda_allocated_mb": null,
+    "cuda_peak_allocated_mb": null,
+    "cuda_reserved_mb": null,
+    "no_leak": true
   }
 }

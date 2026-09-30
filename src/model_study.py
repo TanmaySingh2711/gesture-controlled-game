@@ -237,14 +237,17 @@ def batch1_latency(model: nn.Module, device: torch.device) -> tuple[float, float
     """Median and p95 of single-image float32 forward passes, in milliseconds."""
     model.eval()
     dummy = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE, device=device)
+    on_cuda = device.type == "cuda"
     for _ in range(LATENCY_WARMUP):
         model(dummy)
-    torch.cuda.synchronize()
+    if on_cuda:
+        torch.cuda.synchronize()
     samples = []
     for _ in range(LATENCY_RUNS):
         started = time.perf_counter()
         model(dummy)
-        torch.cuda.synchronize()
+        if on_cuda:
+            torch.cuda.synchronize()
         samples.append((time.perf_counter() - started) * 1000.0)
     samples.sort()
     return statistics.median(samples), samples[int(0.95 * len(samples)) - 1]
@@ -264,7 +267,8 @@ def train_one(
     set_seed(config.seed)
     model = architecture.build().to(device)
     criterion = nn.CrossEntropyLoss()
-    scaler = torch.amp.GradScaler("cuda")
+    on_cuda = device.type == "cuda"
+    scaler = torch.amp.GradScaler(device.type, enabled=on_cuda)
     train_loader, val_loader = loaders
 
     best_loss, best_accuracy, best_epoch, best_stage = math.inf, -1.0, 0, ""
@@ -330,14 +334,15 @@ def train_one(
         "parameters": sum(p.numel() for p in model.parameters()),
         "latency_batch1_median_ms": latency_median,
         "latency_batch1_p95_ms": latency_p95,
-        "peak_vram_mb": torch.cuda.max_memory_allocated() / 1024**2,
+        "peak_vram_mb": torch.cuda.max_memory_allocated() / 1024**2 if on_cuda else 0.0,
     }
     if save_to is not None:
         save_to.parent.mkdir(parents=True, exist_ok=True)
         torch.save({"state_dict": best_state, "result": result}, save_to)
     del model
-    torch.cuda.empty_cache()
-    torch.cuda.reset_peak_memory_stats()
+    if on_cuda:
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
     return result
 
 

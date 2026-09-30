@@ -280,17 +280,25 @@ def benchmark(
 ) -> dict[str, Any]:
     """CNN-only forward-pass latency: no webcam, no OpenCV, no Pygame, no disk I/O.
 
-    Timed with CUDA events around each individual pass, so the result is a distribution
-    rather than one averaged number. This measures the model alone - the end-to-end webcam
-    frame rate in P6 will be lower, because capture, ROI cropping and drawing all add time.
+    Timed around each individual pass - with CUDA events on the GPU, the wall clock on the CPU -
+    so the result is a distribution rather than one averaged number. This measures the model
+    alone - the end-to-end webcam frame rate in P6 will be lower, because capture, ROI cropping
+    and drawing all add time.
     """
     dummy = torch.randn(batch, 3, IMAGE_SIZE, IMAGE_SIZE, device=device)
+    on_cuda = device.type == "cuda"
     for _ in range(BENCHMARK_WARMUP):
         model(dummy)
-    torch.cuda.synchronize()
+    if on_cuda:
+        torch.cuda.synchronize()
 
     samples = []
     for _ in range(runs):
+        if not on_cuda:
+            started = time.perf_counter()
+            model(dummy)
+            samples.append((time.perf_counter() - started) * 1000.0)
+            continue
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
         start_event.record()
@@ -549,14 +557,15 @@ def lowest_confidence_report(
 def latency_report(model: nn.Module, device: torch.device) -> tuple[dict[str, Any], dict[str, Any]]:
     latency = benchmark(model, device, batch=1)
     throughput = benchmark(model, device, batch=32, runs=100)
+    kind = "GPU" if device.type == "cuda" else "CPU"
     print()
     print(
-        f"CNN-only GPU latency, batch 1: mean {latency['mean_ms']:.3f} ms | "
+        f"CNN-only {kind} latency, batch 1: mean {latency['mean_ms']:.3f} ms | "
         f"median {latency['median_ms']:.3f} | p95 {latency['p95_ms']:.3f} | "
         f"~{latency['predictions_per_second']:.0f} predictions/sec"
     )
     print(
-        f"CNN-only GPU throughput, batch 32: mean {throughput['mean_ms']:.3f} ms/batch | "
+        f"CNN-only {kind} throughput, batch 32: mean {throughput['mean_ms']:.3f} ms/batch | "
         f"~{throughput['predictions_per_second']:.0f} images/sec"
     )
     print("  (model forward pass only - webcam capture, ROI cropping and drawing are extra)")
@@ -570,7 +579,7 @@ def write_metrics(record: EvaluationRecord, path: str) -> None:
         "evaluated_split": record.split_name,
         "evaluated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "phase": "P5" if record.split_name == "test" else "pipeline check",
-        "device": torch.cuda.get_device_name(0),
+        "device": torch.cuda.get_device_name(0) if record.model_on_cuda else "cpu",
         "pytorch": torch.__version__,
         "cuda": torch.version.cuda,
         "inference": "torch.inference_mode, float32, no autocast, model.eval()",
@@ -663,7 +672,7 @@ def run_evaluation(
         batch_size=BATCH_SIZE,
         shuffle=False,
         num_workers=0,
-        pin_memory=True,
+        pin_memory=device.type == "cuda",
     )
     transform_names = [type(t).__name__ for t in eval_transform().transforms]
     print(

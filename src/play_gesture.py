@@ -164,6 +164,16 @@ def loading_text(snapshot: Snapshot, use_camera: bool, theme: Theme = CLASSIC) -
     return "Camera ready", theme.ok
 
 
+def diagnostics_text(snapshot: Snapshot, fps: float) -> str:
+    """The panel's small print: raw class, CNN time, the processor it ran on, and game FPS.
+
+    The processor is shown so that falling back from the GPU to the CPU is never silent.
+    """
+    raw = (snapshot.raw_direction or "-")[:5]
+    device = {"cuda": " gpu", "cpu": " cpu"}.get(snapshot.device.split(":")[0], "")
+    return f"raw {raw:<6}{snapshot.inference_ms:5.1f}ms{device} {fps:5.1f}fps"
+
+
 def probability(text: str) -> float:
     """argparse type for a confidence threshold: a number in (0, 1]."""
     try:
@@ -194,12 +204,15 @@ class GesturePacman:
         threshold: float | None = None,
         window: int | None = None,
         agreement: int | None = None,
+        device: str = "auto",
     ) -> None:
         self.use_camera = use_camera
         self.game = Game(caption=TITLE.title(), panel_width=PANEL_WIDTH)
         self.game.help_lines = [*GESTURE_HELP, *self.game.help_lines]
         self.controller: GestureController | None = (
-            GestureController.with_worker(threshold, window, agreement) if use_camera else None
+            GestureController.with_worker(threshold, window, agreement, device)
+            if use_camera
+            else None
         )
 
         self.title_font = pygame.font.SysFont(FONT, 27, bold=True)
@@ -497,8 +510,7 @@ class GesturePacman:
         """
         total = sum(self._recent_frames)
         fps = len(self._recent_frames) / total if total else 0.0
-        raw = (snapshot.raw_direction or "-")[:5]
-        line = f"raw {raw:<6}{snapshot.inference_ms:5.1f}ms {fps:5.1f}fps"
+        line = diagnostics_text(snapshot, fps)
         screen.blit(self.small.render(line, True, self.theme.dim_text), (left, y))
 
     def _update_preview(self, snapshot: Snapshot) -> None:
@@ -610,6 +622,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="override the frozen 0.90 confidence threshold (diagnostics only)",
     )
     parser.add_argument(
+        "--device",
+        choices=["auto", "cuda", "cpu"],
+        default="auto",
+        help="where the CNN runs: auto uses an NVIDIA GPU when present, otherwise the CPU",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -622,7 +640,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=args.log_level, format="%(levelname)s %(name)s: %(message)s")
 
-    app = GesturePacman(use_camera=not args.no_camera, threshold=args.threshold)
+    app = GesturePacman(use_camera=not args.no_camera, threshold=args.threshold, device=args.device)
     if args.benchmark:
         app.benchmark(args.benchmark)
     else:

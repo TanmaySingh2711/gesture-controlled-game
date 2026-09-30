@@ -12,7 +12,7 @@ The CNN that turns a webcam view of a hand into a Pac-Man direction.
 | Output | Softmax over `left`, `right`, `up`, `down` (index 0-3) |
 | File | `model/best_direction_model.pt`, SHA-256 `e57cab3b2fc5ddeba362f7e41586663b02feeed7ca2af49420f7bc7bc255cd3c` |
 | Task id | `pacman_direction_v1`, stored in the checkpoint and checked on every load |
-| Framework | PyTorch 2.14 with CUDA 13, RTX 3050 Ti Laptop GPU (4 GB); no CPU fallback, by project policy |
+| Framework | PyTorch 2.14. Trained and evaluated with CUDA 13 on an RTX 3050 Ti Laptop GPU (4 GB). Inference also runs on the CPU (about 12 ms per frame), with the same predicted class as the GPU on all 200 validation images and confidences within 0.005 |
 | Data | 2,000 HaGRID hand crops, see [DATASET_CARD.md](DATASET_CARD.md) |
 
 ## Intended use
@@ -106,18 +106,48 @@ predicted as a thumb gesture (`up` or `down`); only one confused `up` with `down
 These are still HaGRID photos, not webcam frames, so this measures generalisation across people,
 not across cameras.
 
+## Robustness to simulated camera conditions
+
+The same 2,000 unseen-people images were re-scored under simulated webcam problems
+(`python -m src.evaluate_robustness`, results in `reports/robustness.json`). This is measurement
+only: nothing was trained or tuned from it. "Wrong + accepted" is the share of images that were
+misread *and* still passed the 0.90 threshold, the frames that could turn Pac-Man the wrong way
+if three of them fell inside one five-frame window.
+
+| Condition | Accuracy | Passes 0.90 | Wrong + accepted |
+|---|---|---|---|
+| Clean | 99.6% | 98.4% | 0.05% |
+| Dim light (brightness x0.4) / dark room (x0.25) | 99.4% / 98.1% | 95.4% / 90.9% | 0.05% / 0.15% |
+| Flat light, warm or cool colour cast | 99.0-99.4% | 96.6-96.9% | 0.05-0.20% |
+| Cheap webcam JPEG (quality 15), low resolution (48 px) | 98.4% / 97.9% | 94.3% / 92.0% | 0.25% / 0.15% |
+| Hand tilted 20 degrees either way | 98.6-98.7% | 95.5-96.2% | 0.30-0.35% |
+| Slight blur (radius 1.5) | 98.4% | 90.5% | 0.10% |
+| **Harsh light (brightness x1.6)** | **94.0%** | 87.5% | **1.25%** |
+| **Sensor noise, sigma 15** | **94.3%** | 88.2% | **1.05%** |
+| **Strong blur (radius 3)** | **76.7%** | 62.0% | **5.35%** |
+| **Heavy sensor noise, sigma 30** | **58.6%** | 54.2% | **12.35%** |
+
+**Finding:** ordinary lighting changes, colour casts, compression, low resolution and a tilted hand
+barely matter. Three conditions do: over-exposure, strong blur (a hand moving fast, or a camera
+out of focus), and heavy sensor noise, which is what a webcam produces when it boosts its gain in
+a dark room. Under heavy noise, one frame in eight is a confident wrong answer. Training
+augmentation never included noise or blur, which is the likely reason.
+
 ## Live behaviour (P6, real webcam)
 
 | Measure | Result |
 |---|---|
 | Held gestures recognised | 80/80 |
 | False commands from an idle or absent hand | 0/40 |
-| Wrong turns during natural-speed gesture changes | 0/6 |
-| Gesture seen to stable command | 143 ms mean, 217 ms 95th percentile |
-| Memory | 22 MB peak GPU memory; no growth over 5,000 frames (`reports/memory_profile.json`) |
+| Gesture changes that passed through a wrong command | published run 0/6; first attempt 2/12; together 2/18 |
+| Time for a whole gesture change, hand movement included | published run median 1.3 s (0.8-1.6 s); first attempt median 2.9 s (1.1-15.3 s) |
+| Recognizer's own decision time (CNN first sees the new gesture to stable command) | 143 ms mean, 217 ms 95th percentile (published run) |
+| Memory | 22 MB peak GPU memory; no growth over 5,000 frames on the GPU or the CPU (`reports/memory_profile.json`) |
 
-The threshold and the smoothing window were both chosen from these live trials, never from the
-test set.
+The two transition runs used identical settings, four minutes apart; the first used an earlier
+version of the recorder that did not yet time the recognizer separately from the hand. Both are
+kept in `model/`. The threshold and the smoothing window were both chosen from these live
+trials, never from the test set.
 
 ## Limitations and risks
 
@@ -129,14 +159,20 @@ test set.
 - **Small test set.** At 200 images, the honest claim is "96.4% to 99.7%", not "99%". The
   2,000-image unseen-person set narrows this to 99.2%-99.8%.
 - **One dataset, one live setup.** Training images come only from HaGRID. The live trials used the
-  development webcam and room; how many people took part was not recorded. Performance in other
-  lighting, camera angles or hands is untested beyond that.
+  development webcam and room; how many people took part was not recorded. Simulated conditions
+  (above) show the model is sensitive to heavy noise, strong blur and over-exposure; other rooms,
+  cameras and hands have not been tested live.
+- **Dark rooms are the riskiest setting.** A webcam's noise in a dark room is the one condition
+  that makes confident wrong answers common (12% of frames at sigma 30). Play in a lit room.
 - **Demographics not analysed.** The HaGRID sample used carries no age or skin-tone labels, so
   fairness across them could not be measured.
 - **Same people in train and test.** 41% of P5 test images share a person with training, because
   HaGRID was not split by person. The unseen-person evaluation above shows this did not inflate
   accuracy, but P5's number alone should not be read as a person-independent result.
-- **CUDA required.** Gesture control does not run without an NVIDIA GPU; the keyboard game does.
+- **Wrong commands during fast changes.** In 2 of 18 recorded gesture changes the hand briefly
+  passed through a shape the recognizer held as another direction for 3 of 5 frames. Smoothing
+  makes this uncommon, not impossible.
+- **Retraining needs CUDA.** Playing does not: the recognizer falls back to the CPU.
 
 ## Security
 

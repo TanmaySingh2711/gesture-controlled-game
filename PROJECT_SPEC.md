@@ -300,6 +300,13 @@ VRAM is limited, the model stays lightweight (MobileNetV2), batch sizes stay con
 only the current batch is transferred to the GPU. OpenCV capture, Pygame rendering and file I/O
 stay on the CPU.
 
+> **Later change (quality round).** Inference now falls back to the CPU when no CUDA GPU is
+> present, so the game can be played on machines without an NVIDIA GPU. The fallback is not
+> silent: the device is logged at start-up, shown in the gesture panel's small print, and reported
+> by `src/environment_check.py`. The CPU gives the same predicted class as the GPU on all 200
+> validation images and takes about 12 ms per frame. Training and the P5 evaluation still require
+> CUDA. See `CHANGELOG.md`.
+
 ## 16. Preprocessing and Data Pipeline
 
 Carried over unchanged except for the class set. **Implemented and verified in P3.**
@@ -392,6 +399,11 @@ Phases are renamed `P1`-`P8` so they cannot be confused with the old objective n
 | **P8** | Integrate and test *(renumbered **Objective 9**)* | The recognizer drives the game through the same `request_direction` seam the keyboard uses. Two decoupled loops: game 59.5 FPS on the main thread, one recognition worker at 29.6 FPS owning the webcam and the model; they share a single immutable snapshot behind a lock, never a queue. `None` issues no command and never stops Pac-Man; a 0.75 s stale timeout prevents a sticky direction; camera failure degrades to keyboard. 28 integration checks pass, with P6 (15/15) and P7 (58/58) still green and the checkpoint byte-identical. Manual sanity test approved. **Complete.** |
 
 Each phase ends with a verification step and a stop, as in the previous workflow.
+
+> **Note on P6's transition figure.** "0/6 spurious transitions" is the second of two transition
+> runs recorded four minutes apart with the same settings. The first, 12 transitions, had 2 that
+> passed through a wrong command and 6 that took over 3 s. Both are kept in `model/`, and the
+> README and model card now report them together (2 of 18).
 
 Work continues under the objective numbering that replaced `P8`.
 

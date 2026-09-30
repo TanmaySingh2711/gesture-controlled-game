@@ -76,6 +76,9 @@ ignore = [
 # The worker imports OpenCV and the recognizer lazily, inside the thread, so that a keyboard-only
 # process - and the whole `game` package - never loads torch or cv2.
 "src/game_integration.py" = ["PLC0415"]
+# The installer's whole job is running fixed commands (the venv's pip, nvidia-smi), and it reads
+# the Windows registry only on Windows, where `winreg` exists.
+"install.py" = ["S603", "PLC0415"]
 # Each profile imports only what it measures: the game profile must not load torch, and the
 # recognizer profile must not initialise pygame.
 "src/measure_memory.py" = ["PLC0415"]
@@ -125,6 +128,8 @@ patch = ["subprocess"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
+# CI (no GPU, no dataset images) measured 94% when this gate was set; a drop below 90% fails it.
+fail_under = 90
 exclude_also = [
     "if __name__ == .__main__.:",
     "raise NotImplementedError",

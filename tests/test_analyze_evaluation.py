@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -127,3 +128,27 @@ def test_predictions_correct_mask() -> None:
         probabilities=np.zeros((2, 4)),
     )
     assert predictions.correct.tolist() == [True, False]
+
+
+def test_main_reports_from_the_saved_predictions_to_any_folder(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Outputs outside the project used to crash the final message after writing them."""
+    from src import analyze_evaluation
+
+    report, figure = tmp_path / "rigor.json", tmp_path / "reliability.png"
+    assert analyze_evaluation.main(["--report", str(report), "--figure", str(figure)]) == 0
+
+    written = json.loads(report.read_text(encoding="utf-8"))
+    assert written["images"] == 200
+    assert written["accuracy"] == pytest.approx(0.99)
+    assert figure.stat().st_size > 0
+    output = capsys.readouterr().out
+    assert "accuracy        0.9900" in output
+    assert f"saved {report} and {figure}" in output
+
+
+def test_paths_inside_the_project_are_shown_relative() -> None:
+    from src.analyze_evaluation import PROJECT_ROOT, shown
+
+    assert shown(PROJECT_ROOT / "reports" / "x.json") == str(Path("reports") / "x.json")

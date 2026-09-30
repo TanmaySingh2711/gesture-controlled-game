@@ -3,7 +3,61 @@
 All notable changes to CNN Gesture Controlled Pac-Man. The project was built in numbered phases,
 each verified before the next began; the entries below follow those phases.
 
-## [Unreleased] - quality and rigour round
+## [Unreleased] - reach, honesty and evidence round
+
+### Added
+- **CPU fallback.** The recognizer runs on the CPU when there is no CUDA GPU (about 12 ms per
+  frame; the same predicted class as the GPU on all 200 validation images). `--device
+  auto|cuda|cpu` on `play_gesture.py`, `realtime_gesture.py` and `measure_memory.py`. The device is
+  logged at start-up and shown in the panel's small print, so the fallback is never silent.
+  Training and the P5 evaluation still require CUDA.
+- **One-command setup:** `install.py` creates the venv, picks `requirements.txt` (CUDA) or the
+  new `requirements-cpu.txt`, installs the project and runs the environment check. It stops early,
+  with the fix, when a Windows path is too long for PyTorch to install, or when `venv/` was
+  created in another folder (its command shortcuts then point at the old folder and fail
+  silently); `--fresh` rebuilds it.
+- **Environment check** now loads the real model and times a frame on the chosen device; a missing
+  GPU is information, not a failure.
+- **Robustness evaluation:** `src/evaluate_robustness.py` re-scores the 2,000 unseen-people images
+  under 14 simulated camera conditions (`reports/robustness.json`). Lighting, colour casts, JPEG,
+  low resolution and tilt barely matter (97.9-99.4%); harsh light (94.0%), strong blur (76.7%) and
+  heavy dark-room noise (58.6%, 12.4% confidently wrong) do. Measurement only; nothing was tuned.
+- **Multi-person live evidence tools:** `--participant` and `--condition` labels on the live
+  recorders, one new file per session in `reports/live_sessions/`, and `src/live_report.py` to
+  combine sessions per person and per room with Wilson intervals. The protocol is in
+  `docs/MANUAL_TEST_PLAN.md`.
+- **Memory:** a CPU recognizer profile (`recognizer_cpu` in `reports/memory_profile.json`): +24 MB
+  for the model, +0.07 MB per 1,000 frames, no leak.
+- **Tests:** coverage rose from 60% to 94% (lines and branches) in CI conditions - no GPU and no
+  dataset images - with 470+ tests. New suites drive the live tools, the webcam capture tool, the
+  training, evaluation and study code on the CPU over a generated stand-in dataset, and the whole
+  HaGRID download-crop-audit pipeline against a miniature archive served offline. CI now fails if
+  coverage drops below 90%.
+- **Commit messages:** a `commit-message` pre-commit hook requires a conventional prefix such as
+  `fix:` or `docs:` (so "Update" is refused); `pre-commit install` sets up all three hook stages.
+  `pre-commit` is pinned in `requirements-dev.txt`. The README shows the CI status badge.
+
+### Changed
+- **Live results are reported in full.** The P6 transition figure "0/6 wrong turns" was the second
+  of two runs; the first (12 changes, four minutes earlier, same settings) had 2 changes that passed
+  through a wrong command and 6 slower than 3 s. The README, model card and architecture notes now
+  report both (2 of 18). "143 ms" is now described as what it is - the recognizer's own decision
+  time - next to the 1.3 s median a whole gesture change takes.
+- Live recorders no longer default to the frozen P6 files in `model/`; a new session could
+  previously overwrite them.
+
+### Fixed
+- `crop_hagrid_hands.crop_class` and `clear_output`, and `evaluate_external.duplicates_of_dataset`,
+  bound their folders when the module loaded, so redirecting the module's paths (as the tests do)
+  still read or wrote the real project folders. They now look the paths up when called.
+- `analyze_evaluation.main` crashed after writing its report when `--report` or `--figure` pointed
+  outside the project folder.
+- `check_data_pipeline.py` failed its CUDA transfer check on a machine without a GPU; it now skips
+  it, since the pipeline serves the CPU too.
+- `setuptools` pinned to 84.0.0 in `requirements-dev.txt`: the PyTorch CPU index only carries
+  78.1.0, which `pip-audit` rejects, and that failed CI.
+
+## Quality and rigour round
 
 ### Removed
 - `pyarrow`, which only the retired parquet-based dataset script used. Removed from

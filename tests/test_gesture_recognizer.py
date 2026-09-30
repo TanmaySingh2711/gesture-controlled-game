@@ -1,13 +1,15 @@
 """The recognizer's decision logic: threshold first, then a vote that can clear but never invent.
 
 The vote, the reset and the ROI geometry are pure logic, so they are tested on an instance built
-without its constructor (which insists on CUDA) and run everywhere, including CI. Loading, the
-metadata guard and a full prediction need the GPU and are marked accordingly.
+without its constructor. Loading, the metadata guard and full predictions use the real frozen
+checkpoint on the CPU, so they run everywhere, including CI; only the CPU/GPU agreement check
+needs CUDA.
 """
 
 from __future__ import annotations
 
 from collections import deque
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -16,7 +18,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 torch = pytest.importorskip("torch")
-pytest.importorskip("cv2")
+cv2 = pytest.importorskip("cv2")
 
 from torch import Tensor, nn
 
@@ -32,6 +34,7 @@ from src.gesture_recognizer import (
     ROI_Y1,
     DirectionRecognizer,
     open_camera,
+    select_device,
 )
 
 gpu = pytest.mark.gpu
@@ -142,8 +145,32 @@ def test_open_camera_sets_the_frozen_size_or_releases_on_failure(
     }
 
 
-# --- GPU: construction, loading and prediction -------------------------------------------
-@gpu
+# --- device selection --------------------------------------------------------------------
+def test_cpu_is_used_when_there_is_no_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert select_device().type == "cpu"
+    assert select_device("cpu").type == "cpu"
+
+
+def test_asking_for_cuda_without_a_gpu_fails_loudly(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    with pytest.raises(RuntimeError, match="no CUDA GPU is available"):
+        select_device("cuda")
+
+
+def test_the_gpu_is_preferred_but_cpu_can_be_forced(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert select_device().type == "cuda"
+    assert select_device("cuda").type == "cuda"
+    assert select_device("cpu").type == "cpu"
+
+
+def test_an_unknown_device_name_is_refused() -> None:
+    with pytest.raises(ValueError, match="device must be one of"):
+        select_device("tpu")
+
+
+# --- construction, loading and prediction (real checkpoint, CPU) --------------------------
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
@@ -160,7 +187,6 @@ def test_constructor_rejects_settings_that_cannot_work(
         DirectionRecognizer(**kwargs)
 
 
-@gpu
 def test_metadata_that_does_not_describe_the_direction_model_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -177,7 +203,7 @@ def test_metadata_that_does_not_describe_the_direction_model_is_refused(
         lambda *_args, **_kwargs: (torch.nn.Identity(), payload),
     )
     with pytest.raises(RuntimeError, match="checkpoint metadata mismatch") as error:
-        DirectionRecognizer()
+        DirectionRecognizer(device="cpu")
     for problem in ("architecture=resnet18", "task=endless_runner", "input_size", "jump, neutral"):
         assert problem in str(error.value)
 
@@ -192,11 +218,10 @@ class FixedLogits(nn.Module):
         return self.logits.to(batch.device)
 
 
-@gpu
 def test_prediction_thresholds_then_smooths_and_flags_changes() -> None:
     recognizer = voter()
     recognizer.threshold = 0.9
-    recognizer.device = torch.device("cuda")
+    recognizer.device = torch.device("cpu")
     recognizer.transform = gesture_recognizer.inference_transform()
     recognizer.model = FixedLogits()
     roi = np.full((300, 300, 3), 128, dtype=np.uint8)
@@ -219,11 +244,38 @@ def test_prediction_thresholds_then_smooths_and_flags_changes() -> None:
     assert INDEX_TO_DIRECTION[up] == "up"
 
 
-@gpu
 def test_the_frozen_checkpoint_loads_and_predicts_a_full_frame() -> None:
-    recognizer = DirectionRecognizer()
+    recognizer = DirectionRecognizer(device="cpu")
+    assert next(recognizer.model.parameters()).device.type == "cpu"
+    assert not recognizer.model.training
     frame = np.random.default_rng(0).integers(0, 256, (FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
     prediction = recognizer.predict(frame)
     assert prediction.raw_direction in DIRECTIONS
     assert 0.25 <= prediction.raw_confidence <= 1.0
     assert recognizer.metadata["class_to_index"] == {"left": 0, "right": 1, "up": 2, "down": 3}
+
+
+def test_the_frozen_checkpoint_reads_real_dataset_style_crops() -> None:
+    """A clean, centred hand image is recognised confidently and becomes a command in 3 frames."""
+    from src.data_pipeline import PROJECT_ROOT
+
+    sample = Path(PROJECT_ROOT) / "dataset" / "left" / "left_00003.jpg"
+    if not sample.exists():
+        pytest.skip("dataset images are not tracked in git")
+    roi = cv2.imread(str(sample))
+    recognizer = DirectionRecognizer(device="cpu")
+    results = [recognizer.predict_roi(roi) for _ in range(3)]
+    assert results[-1].raw_direction == "left"
+    assert results[-1].stable_command == "left"
+
+
+@gpu
+def test_cpu_and_gpu_give_the_same_answers() -> None:
+    """The CPU fallback is the same model: same class and near-identical confidence."""
+    frames = np.random.default_rng(1).integers(0, 256, (8, 300, 300, 3), np.uint8)
+    cpu, cuda = DirectionRecognizer(device="cpu"), DirectionRecognizer(device="cuda")
+    for roi in frames:
+        a, b = cpu.predict_roi(roi), cuda.predict_roi(roi)
+        assert a.raw_direction == b.raw_direction
+        # CUDA convolutions use TF32, so confidences differ in the third decimal at most.
+        assert abs(a.raw_confidence - b.raw_confidence) < 0.01
