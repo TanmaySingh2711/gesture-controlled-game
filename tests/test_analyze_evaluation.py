@@ -10,6 +10,7 @@ import pytest
 
 from src.analyze_evaluation import (
     CLASSES,
+    PREDICTIONS_PATH,
     Predictions,
     analyse,
     bootstrap_interval,
@@ -101,10 +102,9 @@ def test_selective_prediction_trades_coverage_for_accuracy() -> None:
 
 
 def test_the_saved_p5_predictions_reproduce_the_reported_accuracy() -> None:
-    path = Path(__file__).resolve().parent.parent / "model" / "direction_test_predictions.csv"
-    if not path.exists():
-        pytest.skip("P5 predictions file not present")
-    predictions = load_predictions(path)
+    # The file is tracked in git, so a missing file is a failure, never a skip.
+    assert PREDICTIONS_PATH.is_file(), f"{PREDICTIONS_PATH} is missing"
+    predictions = load_predictions(PREDICTIONS_PATH)
     assert len(predictions.true) == 200
     report = analyse(predictions)
     assert report["accuracy"] == pytest.approx(0.99)

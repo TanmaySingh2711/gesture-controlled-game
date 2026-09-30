@@ -37,6 +37,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from src.paths import shown
+
 CLASSES = ["left", "right", "up", "down"]
 SOURCE_CLASS = {"left": "fist", "right": "palm", "up": "like", "down": "dislike"}
 GESTURE_NAME = {
@@ -175,7 +177,7 @@ def write_sample_grid(stats: dict[str, dict[str, Any]]) -> None:
     os.makedirs(QA_DIR, exist_ok=True)
     cv2.imwrite(GRID_PATH, grid)
     print(
-        f"[NOTE] sample grid written to {os.path.relpath(GRID_PATH, PROJECT_ROOT)} "
+        f"[NOTE] sample grid written to {shown(GRID_PATH, PROJECT_ROOT)} "
         f"({grid.shape[1]}x{grid.shape[0]})"
     )
 
@@ -231,7 +233,7 @@ def write_updown_grid(stats: dict[str, dict[str, Any]]) -> None:
     cv2.imwrite(UPDOWN_PATH, sheet)
     print(
         f"[NOTE] up/down orientation sheet written to "
-        f"{os.path.relpath(UPDOWN_PATH, PROJECT_ROOT)} ({sheet.shape[1]}x{sheet.shape[0]})"
+        f"{shown(UPDOWN_PATH, PROJECT_ROOT)} ({sheet.shape[1]}x{sheet.shape[0]})"
     )
 
 

@@ -64,6 +64,18 @@ each verified before the next began; the entries below follow those phases.
   previously overwrite them.
 
 ### Fixed
+- Messages that print a saved file's path crashed on Windows when the file was on another drive
+  than the project (found by the Windows CI runner, whose temp folder is on another drive). All
+  21 now go through `src/paths.shown`, which falls back to the full path.
+- The environment check failed any machine slower than 30 ms per frame, although the game stays
+  at 60 FPS on a slower CPU and gestures are only recognised later. It now passes under 33 ms
+  (one webcam frame), warns up to 100 ms, and fails only above that. GitHub's macOS runner takes
+  about 60 ms.
+- `install.py` mistook the `--clear` that `install.py --fresh` itself records in `pyvenv.cfg` for
+  a venv moved from another folder, so it refused to run again after `--fresh`.
+- A test of the saved P5 predictions skipped silently after the file moved; it now uses the
+  module's path and fails if the tracked file is missing.
+- CI actions updated to v7 (Node 24).
 - `crop_hagrid_hands.crop_class` and `clear_output`, and `evaluate_external.duplicates_of_dataset`,
   bound their folders when the module loaded, so redirecting the module's paths (as the tests do)
   still read or wrote the real project folders. They now look the paths up when called.

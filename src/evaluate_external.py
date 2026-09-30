@@ -32,6 +32,7 @@ from torch.utils.data import DataLoader
 from src import analyze_evaluation as rigor
 from src.data_pipeline import CLASS_TO_INDEX, GestureDataset, eval_transform
 from src.evaluate_model import BATCH_SIZE, evaluate, load_model, write_predictions
+from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 EXTERNAL_DIR: Final = PROJECT_ROOT / "dataset_external"
@@ -185,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if report["provisional"]:
         print("WARNING: lineage was incomplete, so some dataset people may not have been excluded")
-    print(f"report: {REPORT_PATH.relative_to(PROJECT_ROOT)}")
+    print(f"report: {shown(REPORT_PATH, PROJECT_ROOT)}")
     return 0
 
 

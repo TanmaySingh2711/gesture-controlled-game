@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from src.analyze_evaluation import wilson_interval
+from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 SESSIONS_DIR: Final = PROJECT_ROOT / "reports" / "live_sessions"
@@ -144,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"by {title}:")
         for name, block in report[key].items():
             print(f"  {name:<34} {describe(block)}")
-    print(f"report: {REPORT_PATH.relative_to(PROJECT_ROOT)}")
+    print(f"report: {shown(REPORT_PATH, PROJECT_ROOT)}")
     return 0
 
 

@@ -40,6 +40,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
+from src.paths import shown
+
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 PREDICTIONS_PATH: Final = (
     PROJECT_ROOT / "reports" / "p5_evaluation" / "direction_test_predictions.csv"
@@ -304,16 +306,8 @@ def main(argv: list[str] | None = None) -> int:
         f"({live['coverage']:.1%}), accuracy {live['accuracy']:.4f}, "
         f"{live['errors_accepted']} errors accepted"
     )
-    print(f"saved {shown(args.report)} and {shown(args.figure)}")
+    print(f"saved {shown(args.report, PROJECT_ROOT)} and {shown(args.figure, PROJECT_ROOT)}")
     return 0
-
-
-def shown(path: Path) -> str:
-    """A path relative to the project when it is inside it, otherwise as given."""
-    try:
-        return str(path.resolve().relative_to(PROJECT_ROOT))
-    except ValueError:
-        return str(path)
 
 
 if __name__ == "__main__":

@@ -58,6 +58,7 @@ from src.data_pipeline import (
     SEED,
     get_dataloaders,
 )
+from src.paths import shown
 
 MODEL_DIR = os.path.join(PROJECT_ROOT, "model")
 CHECKPOINT_PATH = os.path.join(MODEL_DIR, "best_direction_model.pt")
@@ -478,8 +479,8 @@ def train(batch_size: int, device: torch.device | None = None) -> tuple[dict[str
         f"stage2={run.stage_epochs['stage2_finetune']}"
     )
     print(f"peak VRAM {peak_mb:.0f} MB | total time {total_time / 60:.1f} min")
-    print(f"checkpoint {os.path.relpath(CHECKPOINT_PATH, PROJECT_ROOT)}")
-    print(f"history    {os.path.relpath(HISTORY_PATH, PROJECT_ROOT)}")
+    print(f"checkpoint {shown(CHECKPOINT_PATH, PROJECT_ROOT)}")
+    print(f"history    {shown(HISTORY_PATH, PROJECT_ROOT)}")
     return run.best, batch_size
 
 
@@ -585,7 +586,7 @@ def plot_curves(history: list[dict[str, Any]], best: dict[str, Any]) -> None:
     figure.tight_layout()
     figure.savefig(CURVES_PATH, dpi=130)
     plt.close(figure)
-    print(f"curves     {os.path.relpath(CURVES_PATH, PROJECT_ROOT)}")
+    print(f"curves     {shown(CURVES_PATH, PROJECT_ROOT)}")
 
 
 def verify_checkpoint(batch_size: int, device: torch.device | None = None) -> bool:

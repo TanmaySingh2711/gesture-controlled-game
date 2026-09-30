@@ -44,6 +44,7 @@ from torchvision import models
 
 from src.analyze_evaluation import calibration
 from src.data_pipeline import BATCH_SIZE, IMAGE_SIZE, PROJECT_ROOT, get_dataloaders
+from src.paths import shown
 from src.train_model import (
     NUM_CLASSES,
     PATIENCE,
@@ -467,7 +468,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{result['latency_batch1_median_ms']:.2f} ms  {result['train_seconds']:.0f}s",
             flush=True,
         )
-    print(f"report: {report_path.relative_to(PROJECT_ROOT)}", flush=True)
+    print(f"report: {shown(report_path, PROJECT_ROOT)}", flush=True)
     return 0
 
 

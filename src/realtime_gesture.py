@@ -76,6 +76,7 @@ from src.gesture_recognizer import (
     label_of,
     open_camera,
 )
+from src.paths import shown
 
 TRIALS_PER_CLASS = 20
 # The frozen P6 records. Kept for reference; new sessions never default to them.
@@ -482,7 +483,7 @@ def trials(
 
     write_records(out_path, records)
     summarise(records, category_list)
-    print(f"saved {os.path.relpath(out_path, PROJECT_ROOT)}")
+    print(f"saved {shown(out_path, PROJECT_ROOT)}")
     return records
 
 
@@ -697,7 +698,7 @@ def transitions(
 
     write_records(out_path, records)
     summarise_transitions(records)
-    print(f"saved {os.path.relpath(out_path, PROJECT_ROOT)}")
+    print(f"saved {shown(out_path, PROJECT_ROOT)}")
     return records
 
 

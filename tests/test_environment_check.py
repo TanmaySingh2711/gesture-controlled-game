@@ -21,6 +21,7 @@ from src import environment_check as env
 def fresh_results(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[tuple[str, bool, str]]]:
     results: list[tuple[str, bool, str]] = []
     monkeypatch.setattr(env, "results", results)
+    monkeypatch.setattr(env, "warnings", [])
     yield results
 
 
@@ -94,15 +95,45 @@ def test_the_gesture_model_check_loads_and_times_the_real_model(
     assert "checksum verified" in detail
 
 
-def test_a_model_too_slow_for_the_webcam_fails(
+def test_a_model_slower_than_the_webcam_is_a_warning_not_a_failure(
+    monkeypatch: pytest.MonkeyPatch, fresh_results: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A slow CPU still plays: the game keeps 60 FPS, gestures are just recognised less often."""
+    pytest.importorskip("torch")
+    monkeypatch.setattr(env, "FRAME_BUDGET_MS", 0.0)
+    env.check_gesture_model()
+    assert verdicts(fresh_results) == {"Gesture model": True}
+    assert [name for name, _ in env.warnings] == ["Gesture speed"]
+    assert "gestures will be recognised a little later" in capsys.readouterr().out
+
+
+def test_a_model_too_slow_to_steer_fails(
     monkeypatch: pytest.MonkeyPatch, fresh_results: list[Any]
 ) -> None:
     pytest.importorskip("torch")
     monkeypatch.setattr(env, "FRAME_BUDGET_MS", 0.0)
+    monkeypatch.setattr(env, "USABLE_LIMIT_MS", 0.0)
     env.check_gesture_model()
     (_, passed, detail) = fresh_results[0]
     assert passed is False
-    assert "needs < 0 ms to keep up" in detail
+    assert "too slow to steer the game (needs < 0 ms)" in detail
+
+
+def test_main_passes_with_warnings_listed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for name in ("check_python", "check_torch_and_cuda", "check_pygame", "check_webcam"):
+        monkeypatch.setattr(env, name, lambda: None)
+    monkeypatch.setattr(env, "check_import", lambda *_args: None)
+
+    def slow_but_working() -> None:
+        env.record("Gesture model", True, "runs")
+        env.warn("Gesture speed", "slow")
+
+    monkeypatch.setattr(env, "check_gesture_model", slow_but_working)
+    monkeypatch.setattr(sys, "argv", ["environment_check.py"])
+    assert env.main() == 0
+    assert "RESULT: PASS (all 1 checks passed, 1 warning: Gesture speed)" in capsys.readouterr().out
 
 
 def test_a_model_that_cannot_load_fails(

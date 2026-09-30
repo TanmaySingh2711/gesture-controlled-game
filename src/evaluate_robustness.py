@@ -35,6 +35,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from src.data_pipeline import CLASS_TO_INDEX, eval_transform
 from src.evaluate_model import BATCH_SIZE, load_model
+from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 MANIFEST_PATH: Final = PROJECT_ROOT / "dataset_external" / "manifest.json"
@@ -248,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
     print(f"worst: {worst['condition']} at {worst['accuracy']:.4f} (clean {clean:.4f})")
-    print(f"report: {REPORT_PATH.relative_to(PROJECT_ROOT)}")
+    print(f"report: {shown(REPORT_PATH, PROJECT_ROOT)}")
     return 0
 
 

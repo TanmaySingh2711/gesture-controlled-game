@@ -56,6 +56,8 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import v2
 
+from src.paths import shown
+
 # --- frozen constants -------------------------------------------------------------------
 CLASS_TO_INDEX = {"left": 0, "right": 1, "up": 2, "down": 3}
 INDEX_TO_CLASS = {index: name for name, index in CLASS_TO_INDEX.items()}
@@ -254,6 +256,6 @@ def get_dataloaders(
 
 if __name__ == "__main__":
     payload = build_split(force=True)
-    print(f"split written to {os.path.relpath(SPLIT_PATH, PROJECT_ROOT)}")
-    print(f"mapping written to {os.path.relpath(MAPPING_PATH, PROJECT_ROOT)}")
+    print(f"split written to {shown(SPLIT_PATH, PROJECT_ROOT)}")
+    print(f"mapping written to {shown(MAPPING_PATH, PROJECT_ROOT)}")
     print("counts:", payload["counts"])

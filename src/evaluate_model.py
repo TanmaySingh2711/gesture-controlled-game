@@ -50,6 +50,7 @@ from src.data_pipeline import (
     eval_transform,
     load_split,
 )
+from src.paths import shown
 from src.train_model import CHECKPOINT_PATH, load_direction_checkpoint
 
 # The P5 results: written once, by the single evaluation on the test split, and frozen since.
@@ -375,7 +376,7 @@ class EvaluationRecord:
 def _print_model(model: nn.Module, payload: dict[str, Any]) -> None:
     parameter_device = next(model.parameters()).device
     print(
-        f"checkpoint     : {os.path.relpath(CHECKPOINT_PATH, PROJECT_ROOT)} "
+        f"checkpoint     : {shown(CHECKPOINT_PATH, PROJECT_ROOT)} "
         f"({os.path.getsize(CHECKPOINT_PATH) / 1e6:.2f} MB)"
     )
     print(
@@ -421,7 +422,7 @@ def confusion_report(
     for index, row in enumerate(matrix):
         print(f"  {CLASSES[index]:<8} {row}")
     plot_confusion(matrix, path, subject)
-    print(f"  saved {os.path.relpath(path, PROJECT_ROOT)}")
+    print(f"  saved {shown(path, PROJECT_ROOT)}")
 
     # The pairs worth naming explicitly: up/down are the orientation-sensitive pair, and
     # left->down was the single validation error in P4.
@@ -478,7 +479,7 @@ def write_predictions(
                     *(f"{probabilities[index][c]:.6f}" for c in range(NUM_CLASSES)),
                 ]
             )
-    print(f"  saved {os.path.relpath(path, PROJECT_ROOT)} ({len(entries)} rows)")
+    print(f"  saved {shown(path, PROJECT_ROOT)} ({len(entries)} rows)")
 
 
 def describe(values: Any) -> dict[str, float] | None:
@@ -551,7 +552,7 @@ def lowest_confidence_report(
             f"{os.path.basename(entries[index]['path'])}"
         )
     plot_low_confidence_correct(entries, results, lowest, path)
-    print(f"  saved {os.path.relpath(path, PROJECT_ROOT)}")
+    print(f"  saved {shown(path, PROJECT_ROOT)}")
     return records
 
 
@@ -655,7 +656,7 @@ def write_metrics(record: EvaluationRecord, path: str) -> None:
     }
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(metrics, handle, indent=1)
-    print(f"  saved {os.path.relpath(path, PROJECT_ROOT)}")
+    print(f"  saved {shown(path, PROJECT_ROOT)}")
 
 
 def run_evaluation(
@@ -706,10 +707,7 @@ def run_evaluation(
 
     wrong_count = plot_misclassified(entries, results, paths.misclassified)
     if wrong_count:
-        print(
-            f"  saved {os.path.relpath(paths.misclassified, PROJECT_ROOT)} "
-            f"({wrong_count} misclassified)"
-        )
+        print(f"  saved {shown(paths.misclassified, PROJECT_ROOT)} ({wrong_count} misclassified)")
     else:
         print("  no misclassified images - misclassification sheet not created")
 

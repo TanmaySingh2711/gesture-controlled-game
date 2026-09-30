@@ -46,6 +46,7 @@ from src.data_pipeline import (
     get_dataloaders,
     train_transform,
 )
+from src.paths import shown
 
 TRAIN_PER_CLASS, VAL_PER_CLASS, TEST_PER_CLASS = 400, 50, 50
 EXPECTED = {"train": 1600, "val": 200, "test": 200}
@@ -455,7 +456,7 @@ def write_augmentation_grid(split: dict[str, Any], variants: int = 6) -> None:
     cv2.imwrite(GRID_PATH, grid)
     print(
         f"[NOTE] augmentation grid written to "
-        f"{os.path.relpath(GRID_PATH, PROJECT_ROOT)} ({grid.shape[1]}x{grid.shape[0]})"
+        f"{shown(GRID_PATH, PROJECT_ROOT)} ({grid.shape[1]}x{grid.shape[0]})"
     )
 
 
@@ -510,7 +511,7 @@ def write_updown_grid(split: dict[str, Any], rows_per_class: int = 3, variants: 
     cv2.imwrite(UPDOWN_GRID_PATH, sheet)
     print(
         f"[NOTE] up/down augmentation sheet written to "
-        f"{os.path.relpath(UPDOWN_GRID_PATH, PROJECT_ROOT)} "
+        f"{shown(UPDOWN_GRID_PATH, PROJECT_ROOT)} "
         f"({sheet.shape[1]}x{sheet.shape[0]})"
     )
 
