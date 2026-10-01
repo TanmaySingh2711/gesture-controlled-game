@@ -76,6 +76,17 @@ RECONNECT_ATTEMPTS: Final = 3
 RECONNECT_DELAY: Final = 1.0  # seconds between reconnection attempts
 PREVIEW_EVERY: Final = 1  # publish a preview frame every N recognitions
 
+# A camera can be open and delivering frames that hold no picture: all black, or random static.
+# That is what a webcam sends when its privacy switch is off (Fn+F6 on MSI laptops), its shutter
+# is closed, or another program holds it. Such frames must never reach the CNN, which would
+# happily read a direction into the noise.
+BLANK_LEVEL: Final = 4.0  # brightness and spread (0-255) below this: no light reaches the sensor
+STATIC_LEVEL: Final = 50.0  # mean difference between neighbouring pixels; noise ~85, pictures < 35
+# How long the picture must be missing before the panel says so: this many frames in a row, or
+# this long, whichever comes first. A switched-off webcam may deliver only a frame a second.
+NO_PICTURE_FRAMES: Final = 15
+NO_PICTURE_SECONDS: Final = 0.5
+
 # Latency samples are kept in bounded windows, so a long session cannot grow memory. Ten
 # minutes of frames at ~30 FPS is far more than any summary needs.
 LATENCY_HISTORY: Final = 30 * 60 * 10
@@ -87,6 +98,7 @@ STATUS_LINES: Final = {
     "loading model": "INITIALIZING CAMERA / GESTURE CONTROL",
     "opening camera": "INITIALIZING CAMERA / GESTURE CONTROL",
     "reconnecting": "GESTURE: RECONNECTING CAMERA",
+    "no picture": "NO CAMERA PICTURE - keyboard works",
     "stopped": "GESTURE OFF - keyboard only",
 }
 
@@ -190,6 +202,29 @@ def percentile(samples: list[float], fraction: float) -> float:
     return ordered[rank]
 
 
+def picture_problem(frame: Any) -> str | None:
+    """Why `frame` holds no usable picture ("black" or "static"), or None when it does.
+
+    Judged on the middle of the frame. A dark room is not "black": its picture still has some
+    light and grain. Real pictures, even noisy ones, have neighbouring pixels that resemble each
+    other; random static does not.
+    """
+    import numpy as np  # lazily, like every heavy import here
+
+    pixels = np.asarray(frame)
+    height, width = pixels.shape[:2]
+    middle = pixels[height // 4 : 3 * height // 4, width // 4 : 3 * width // 4].astype(np.int16)
+    if middle.size == 0:
+        return "black"
+    if float(middle.mean()) < BLANK_LEVEL and float(middle.std()) < BLANK_LEVEL:
+        return "black"
+    across = float(np.abs(np.diff(middle, axis=1)).mean())
+    down = float(np.abs(np.diff(middle, axis=0)).mean())
+    if max(across, down) > STATIC_LEVEL:
+        return "static"
+    return None
+
+
 def _real_camera() -> Capture:
     from src.gesture_recognizer import open_camera
 
@@ -219,6 +254,7 @@ class RecognitionWorker(threading.Thread):
         mirror: Callable[[Any], Any] | None = None,
         reconnect_delay: float = RECONNECT_DELAY,
         device: str = "auto",
+        picture_check: Callable[[Any], str | None] | None = None,
     ) -> None:
         super().__init__(name=name, daemon=True)
         self.state = state
@@ -229,6 +265,10 @@ class RecognitionWorker(threading.Thread):
         self._camera_factory = camera_factory or _real_camera
         self._recognizer_factory = recognizer_factory or self._real_recognizer
         self._mirror = mirror or _cv2_mirror
+        self._picture_problem = picture_check or picture_problem
+        self.no_picture_frames = 0  # consecutive frames without a usable picture
+        self.no_picture_since: float | None = None  # when that run of frames began
+        self.no_picture = False  # whether the panel is currently being told so
         self.reconnect_delay = reconnect_delay
         # NOT `self._stop`: threading.Thread already has a private _stop() method and
         # shadowing it breaks Thread.join().
@@ -286,6 +326,46 @@ class RecognitionWorker(threading.Thread):
             self.state.publish(camera_ok=False, stable_command=None)
         else:
             self.state.publish(status="stopped", camera_ok=False, stable_command=None)
+
+    def _has_picture(self, frame: Any, recognizer: Recognizer, now: float) -> bool:
+        """Whether `frame` may be shown to the CNN. A frame with no picture in it never is.
+
+        After half a second of such frames the panel says so, instead of leaving the player
+        guessing why gestures stopped working.
+        """
+        problem = self._picture_problem(frame)
+        if problem is not None:
+            self._without_picture(recognizer, problem, now)
+            return False
+        if self.no_picture:
+            log.info("the webcam picture is back")
+        self.no_picture_frames, self.no_picture_since, self.no_picture = 0, None, False
+        return True
+
+    def _without_picture(self, recognizer: Recognizer, problem: str, now: float) -> None:
+        """Count one frame that holds no picture, and tell the panel once it has gone on."""
+        self.no_picture_frames += 1
+        if self.no_picture_since is None:
+            self.no_picture_since = now
+        lasting = (
+            self.no_picture_frames >= NO_PICTURE_FRAMES
+            or now - self.no_picture_since >= NO_PICTURE_SECONDS
+        )
+        if not lasting:
+            return
+        if not self.no_picture:
+            self.no_picture = True
+            log.warning("the webcam is open but sending no picture (%s frames)", problem)
+            recognizer.reset()  # nothing from before the blackout may vote afterwards
+        self.state.publish(
+            timestamp=time.perf_counter(),
+            status="no picture",
+            camera_ok=False,
+            stable_command=None,
+            raw_direction=None,
+            error=f"the webcam is sending {problem} frames",
+            preview=None,
+        )
 
     def _reconnect(self, lost: Capture) -> Capture | None:
         """Reopen a webcam that stopped delivering frames. None if it cannot be recovered."""
@@ -349,6 +429,9 @@ class RecognitionWorker(threading.Thread):
                     failures = 0
                     continue
                 failures = 0
+
+                if not self._has_picture(frame, recognizer, captured_at):
+                    continue
 
                 frame = self._mirror(frame)  # mirror convention, applied first
                 result = recognizer.predict(frame)

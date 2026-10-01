@@ -27,6 +27,7 @@ MAX_PYTHON = (3, 12)
 # where a 3-of-5 vote alone takes a third of a second.
 FRAME_BUDGET_MS = 33.0
 USABLE_LIMIT_MS = 100.0
+WEBCAM_SETTLE_FRAMES = 5
 
 results: list[tuple[str, bool, str]] = []
 warnings: list[tuple[str, str]] = []
@@ -186,12 +187,28 @@ def check_webcam() -> None:
         if not capture.isOpened():
             record("Webcam", False, "could not open the default webcam (index 0)")
             return
+        # A few frames, keeping the last: the first ones can be dark while exposure settles.
         ok, frame = capture.read()
-        if ok and frame is not None:
-            height, width = frame.shape[:2]
+        for _ in range(WEBCAM_SETTLE_FRAMES):
+            again, later = capture.read()
+            if again and later is not None:
+                ok, frame = again, later
+        if not ok or frame is None:
+            record("Webcam", False, "webcam opened but no frame was returned")
+            return
+        from src.game_integration import picture_problem
+
+        height, width = frame.shape[:2]
+        problem = picture_problem(frame)
+        if problem is None:
             record("Webcam", True, f"captured a {width}x{height} frame from device 0")
         else:
-            record("Webcam", False, "webcam opened but no frame was returned")
+            record(
+                "Webcam",
+                False,
+                f"the webcam is on but its picture is {problem}: check its privacy switch or "
+                "cover (Fn+F6 on MSI laptops), and that no other program is using it",
+            )
     finally:
         capture.release()
 

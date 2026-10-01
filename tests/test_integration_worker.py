@@ -19,12 +19,14 @@ from game.engine import PLAYING, Game
 from src.game_integration import (
     CAMERA_FAILURE_LIMIT,
     LATENCY_HISTORY,
+    NO_PICTURE_FRAMES,
     RECONNECT_ATTEMPTS,
     GestureController,
     RecognitionWorker,
     SharedState,
     Snapshot,
     percentile,
+    picture_problem,
 )
 
 
@@ -46,12 +48,14 @@ class ScriptedCamera:
         self.default = default
         self.reads = 0
         self.released = 0
+        # A plain mid-grey picture. Tests swap it for black or static to block the camera.
+        self.frame: Any = np.full((480, 640, 3), 110, dtype=np.uint8)
 
     def read(self) -> tuple[bool, Any]:
         self.reads += 1
         ok = self.script.pop(0) if self.script else self.default
         time.sleep(0.0005)
-        return (True, np.zeros((480, 640, 3), dtype=np.uint8)) if ok else (False, None)
+        return (True, self.frame) if ok else (False, None)
 
     def release(self) -> None:
         self.released += 1
@@ -298,3 +302,107 @@ def test_reconnecting_has_its_own_status_line() -> None:
     state = SharedState()
     state.publish(status="reconnecting", camera_ok=False)
     assert GestureController(state).status_line() == "GESTURE: RECONNECTING CAMERA"
+
+
+# --- a camera that is open but sends no picture ------------------------------------------------
+BLACK = np.zeros((480, 640, 3), dtype=np.uint8)
+STATIC = np.random.default_rng(0).integers(0, 256, (480, 640, 3), dtype=np.uint8)
+
+
+def photo_like(noise: float = 0.0, brightness: float = 1.0) -> Any:
+    """A smooth picture - a gradient with a bright blob - optionally dimmed and with sensor noise."""
+    ys, xs = np.mgrid[0:480, 0:640].astype(np.float32)
+    base = 60 + 0.2 * xs + 0.1 * ys + 80 * np.exp(-((xs - 400) ** 2 + (ys - 240) ** 2) / 20000)
+    picture = np.repeat(base[:, :, None], 3, axis=2) * brightness
+    picture += np.random.default_rng(1).normal(0.0, noise, picture.shape)
+    return np.clip(picture, 0, 255).astype(np.uint8)
+
+
+@pytest.mark.parametrize(
+    ("frame", "expected"),
+    [
+        (BLACK, "black"),
+        (STATIC, "static"),
+        (np.full((480, 640, 3), 110, np.uint8), None),
+        (photo_like(), None),
+        (photo_like(brightness=0.12), None),  # a dark room still has a picture in it
+        (photo_like(noise=30.0), None),  # heavy sensor noise is a bad picture, not no picture
+    ],
+    ids=["black", "static", "flat grey", "photo", "dark room", "noisy photo"],
+)
+def test_only_black_and_static_count_as_no_picture(frame: Any, expected: str | None) -> None:
+    assert picture_problem(frame) == expected
+
+
+@pytest.mark.parametrize("blocked", [BLACK, STATIC], ids=["black", "static"])
+def test_frames_without_a_picture_never_reach_the_cnn_and_are_reported(blocked: Any) -> None:
+    state = SharedState()
+    camera = ScriptedCamera()
+    camera.frame = blocked
+    predictions: list[Any] = []
+
+    class CountingRecognizer(FakeRecognizer):
+        def predict(self, mirrored_frame: Any) -> FakePrediction:
+            predictions.append(mirrored_frame)
+            return super().predict(mirrored_frame)
+
+    recognizer = CountingRecognizer("left")
+    worker = make_worker(state, cameras(camera), recognizer)
+    controller = GestureController(state, worker)
+    controller.start()
+    assert wait_for(lambda: state.read().status == "no picture")
+    live = state.read()
+    game = Game(headless=True)
+    applied = controller.apply_to(game)
+    line = controller.status_line()
+    assert controller.stop()
+
+    assert predictions == [], "a black or static frame was shown to the model"
+    assert (live.camera_ok, live.stable_command, live.preview) == (False, None, None)
+    assert "frames" in (live.error or "")
+    assert applied is None, "no direction may be requested while there is no picture"
+    assert line == "NO CAMERA PICTURE - keyboard works"
+    assert worker.no_picture_frames >= 1 and not worker.failed
+
+
+def test_recognition_resumes_when_the_picture_comes_back() -> None:
+    state = SharedState()
+    camera = ScriptedCamera()
+    good, camera.frame = camera.frame, BLACK
+    recognizer = FakeRecognizer("up")
+    worker = make_worker(state, cameras(camera), recognizer)
+    controller = GestureController(state, worker)
+    controller.start()
+    assert wait_for(lambda: state.read().status == "no picture")
+    camera.frame = good  # the player switches the webcam back on
+    assert wait_for(lambda: state.read().status == "ready" and state.read().camera_ok)
+    live = state.read()
+    assert controller.stop()
+
+    assert live.stable_command == "up"
+    assert live.error is None
+    assert recognizer.resets >= 1, "votes from before the blackout must not carry over"
+    assert worker.no_picture_frames == 0
+
+
+def test_a_few_bad_frames_are_skipped_without_alarm() -> None:
+    """A short glitch is dropped silently; only a lasting one is reported."""
+    state = SharedState()
+    worker = make_worker(state, cameras(ScriptedCamera()))
+    recognizer = FakeRecognizer()
+    for index in range(NO_PICTURE_FRAMES - 1):
+        worker._without_picture(recognizer, "black", now=10.0 + index * 0.001)
+    assert state.read().status == "starting", "not yet reported"
+    worker._without_picture(recognizer, "black", now=10.02)
+    assert state.read().status == "no picture"
+
+
+def test_a_slow_blocked_camera_is_reported_by_time() -> None:
+    """A switched-off webcam can deliver one frame a second: time, not count, must trigger."""
+    state = SharedState()
+    worker = make_worker(state, cameras(ScriptedCamera()))
+    recognizer = FakeRecognizer()
+    worker._without_picture(recognizer, "black", now=5.0)
+    assert state.read().status == "starting"
+    worker._without_picture(recognizer, "black", now=6.0)
+    assert state.read().status == "no picture"

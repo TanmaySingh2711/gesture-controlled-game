@@ -321,6 +321,11 @@ A game window opens. There is no web page or server to open.
 
 Use only the four gestures. Other hand shapes can be mistaken for one of them.
 
+**If the panel says `CAMERA: NO PICTURE`:** the webcam is on but sends a black or static
+picture. Check its privacy switch or cover (on MSI laptops the switch is **Fn + F6**), and close
+any other program that is using the camera. Gestures resume by themselves when the picture
+returns. The keyboard keeps working the whole time.
+
 **Keyboard:**
 
 | Key | Action |

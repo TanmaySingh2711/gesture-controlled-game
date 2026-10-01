@@ -62,6 +62,7 @@ odd - a failure with a note is far more useful than a tick without one.
 |---|---|---|---|
 | 5.1 | Play for several minutes | Motion stays smooth; the panel's `fps` stays near 60 | |
 | 5.2 | Unplug the webcam during play (if USB) | Panel shows `RECONNECTING`; plug back in and gestures resume, or `CAMERA ERROR` after the retries - the keyboard keeps working either way | |
+| 5.2b | Switch the webcam off with its privacy key or cover during play (Fn+F6 on MSI) | Within about two seconds the panel shows `CAMERA: NO PICTURE` and Pac-Man takes no gesture turns; switch it back on and gestures resume | |
 | 5.3 | `python src/play_gesture.py --no-camera` | Plays on the keyboard; the panel reads `GESTURE CONTROL: OFF` | |
 | 5.4 | Quit with ESC during play | Window closes promptly with no error | |
 | 5.5 | Quit with the window close button | Same | |

@@ -16,6 +16,11 @@ each verified before the next began; the entries below follow those phases.
   with the fix, when a Windows path is too long for PyTorch to install, or when `venv/` was
   created in another folder (its command shortcuts then point at the old folder and fail
   silently); `--fresh` rebuilds it.
+- **No-picture detection:** a webcam that is open but sends black or static frames (its privacy
+  switch is off, its cover is closed, or another program holds it) used to feed that noise to the
+  CNN and show it in the panel. Such frames are now never recognised; the panel shows
+  `CAMERA: NO PICTURE` with what to check, the environment check fails with the same hint, and
+  recognition resumes by itself when the picture returns.
 - **One-click scripts:** `setup.bat` (Windows) and `setup.sh` (macOS, Linux) find Python 3.12
   and run `install.py`; `run_game.bat` starts the game by double-click. CI's one-click setup jobs
   run these scripts themselves.

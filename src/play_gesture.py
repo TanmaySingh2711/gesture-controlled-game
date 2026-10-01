@@ -85,8 +85,12 @@ log = logging.getLogger(__name__)
 _COMMAND_OVERRIDES: Final = {
     "camera error": "CAMERA ERROR",
     "reconnecting": "RECONNECTING",
+    "no picture": "NO PICTURE",
     "stopped": "GESTURE OFF",
 }
+
+# Shown under the health line when the webcam is open but sends black or static frames.
+NO_PICTURE_HINTS: Final = ("Camera is on but sends no image.", "Check its switch or cover.")
 
 
 def command_text(snapshot: Snapshot, fresh: bool, use_camera: bool) -> str:
@@ -107,7 +111,7 @@ def command_text(snapshot: Snapshot, fresh: bool, use_camera: bool) -> str:
 def command_color(text: str, theme: Theme = CLASSIC) -> Color:
     if text.lower() in theme.directions:
         return theme.directions[text.lower()]
-    if text == "CAMERA ERROR":
+    if text in ("CAMERA ERROR", "NO PICTURE"):
         return theme.error
     if text in ("WAITING", "STARTING", "RECONNECTING"):
         return theme.warn
@@ -124,11 +128,13 @@ def control_status(snapshot: Snapshot, fresh: bool, use_camera: bool) -> str:
         return "GESTURE CONTROL: STARTING"
     if snapshot.status == "reconnecting":
         return "CAMERA RECONNECTING"
+    if snapshot.status == "no picture":
+        return "CAMERA: NO PICTURE"
     return "GESTURE CONTROL: READY" if fresh else "GESTURE CONTROL: WAITING"
 
 
 def status_color(text: str, theme: Theme = CLASSIC) -> Color:
-    if text == "CAMERA ERROR":
+    if text in ("CAMERA ERROR", "CAMERA: NO PICTURE"):
         return theme.error
     if text.endswith("READY"):
         return theme.ok
@@ -153,15 +159,15 @@ def loading_text(snapshot: Snapshot, use_camera: bool, theme: Theme = CLASSIC) -
     """What the start screen says about the recognizer while it is coming up."""
     if not use_camera:
         return "Gesture control off - keyboard only", theme.dim_text
-    if snapshot.status == "camera error":
-        return "CAMERA ERROR - keyboard controls available", theme.error
     if snapshot.status in STARTING_STATUSES:
         return "Initializing gesture recognition...", theme.warn
-    if snapshot.status == "reconnecting":
-        return "Reconnecting to the camera...", theme.warn
-    if snapshot.status == "stopped":
-        return "Gesture control stopped - keyboard still works", theme.dim_text
-    return "Camera ready", theme.ok
+    messages = {
+        "camera error": ("CAMERA ERROR - keyboard controls available", theme.error),
+        "reconnecting": ("Reconnecting to the camera...", theme.warn),
+        "no picture": ("Camera sends no picture - check its switch or cover", theme.error),
+        "stopped": ("Gesture control stopped - keyboard still works", theme.dim_text),
+    }
+    return messages.get(snapshot.status, ("Camera ready", theme.ok))
 
 
 def diagnostics_text(snapshot: Snapshot, fps: float) -> str:
@@ -252,6 +258,7 @@ class GesturePacman:
         cache["controls_label"] = self.heading.render("GESTURE CONTROLS", True, theme.heading)
         cache["keyboard_label"] = self.heading.render("KEYBOARD", True, theme.heading)
         cache["no_image"] = self.small.render("no camera image", True, theme.dim_text)
+        cache["no_picture"] = self.small.render("camera sends no picture", True, theme.error)
         for gesture, direction in GESTURE_ROWS:
             label = f"{gesture:<12}{direction}"
             cache[f"row:{direction}"] = self.font.render(label, True, theme.text)
@@ -434,7 +441,13 @@ class GesturePacman:
         box = pygame.Rect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE)
         box.midtop = (PANEL_CENTRE, y)
         self._update_preview(snapshot)
-        if self.preview_surface is not None:
+        if snapshot.status == "no picture":
+            # The last good frame would be stale and a black or static one is meaningless, so
+            # the box says what is wrong instead.
+            self.preview_surface = None
+            pygame.draw.rect(screen, theme.background, box)
+            screen.blit(cache["no_picture"], cache["no_picture"].get_rect(center=box.center))
+        elif self.preview_surface is not None:
             screen.blit(self.preview_surface, box.topleft)
         else:
             pygame.draw.rect(screen, theme.background, box)
@@ -480,10 +493,14 @@ class GesturePacman:
         status = control_status(snapshot, fresh, self.use_camera)
         screen.blit(self.font.render(status, True, status_color(status, theme)), (PANEL_LEFT, y))
         y += 19
+        hints: tuple[str, ...] = ()
         if status == "CAMERA ERROR":
-            for line in ("Gesture control unavailable.", "Use Arrow Keys / WASD."):
-                screen.blit(self.small.render(line, True, theme.dim_text), (PANEL_LEFT, y))
-                y += 15
+            hints = ("Gesture control unavailable.", "Use Arrow Keys / WASD.")
+        elif status == "CAMERA: NO PICTURE":
+            hints = NO_PICTURE_HINTS
+        for line in hints:
+            screen.blit(self.small.render(line, True, theme.dim_text), (PANEL_LEFT, y))
+            y += 15
 
     def _panel_keyboard(self, snapshot: Snapshot) -> None:
         """Keyboard fallback and diagnostics, pinned to the bottom of the panel."""

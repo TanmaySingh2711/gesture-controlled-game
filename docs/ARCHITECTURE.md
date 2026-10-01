@@ -88,6 +88,7 @@ older than 0.75 s is ignored entirely, so a dead worker cannot leave an old dire
 |---|---|
 | No NVIDIA GPU | The recognizer runs on the CPU instead, logged once at start-up |
 | Model cannot load (wrong or tampered checkpoint) | Reported once as `CAMERA ERROR`; the keyboard keeps working |
+| Webcam is open but sends black or static frames (privacy switch off, cover closed, camera held by another program) | Those frames never reach the CNN. After 15 frames or half a second the panel shows `CAMERA: NO PICTURE` with what to check; recognition resumes when a real picture returns |
 | Webcam stops delivering frames | Reopened up to three times with a pause between attempts, showing `RECONNECTING`; then `CAMERA ERROR` |
 | No audio device | Sound effects become silent no-ops, logged once |
 | Corrupt profile file | Defaults are loaded; saves are atomic |

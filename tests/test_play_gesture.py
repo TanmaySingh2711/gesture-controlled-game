@@ -14,6 +14,7 @@ from src.game_integration import GestureController, SharedState, Snapshot
 from src.play_gesture import (
     FRAME_HISTORY,
     GESTURE_HELP,
+    NO_PICTURE_HINTS,
     PANEL_MARGIN,
     PANEL_WIDTH,
     GesturePacman,
@@ -36,6 +37,7 @@ STATUSES = [
     "opening camera",
     "ready",
     "reconnecting",
+    "no picture",
     "camera error",
     "stopped",
 ]
@@ -71,6 +73,7 @@ def test_headline_command_covers_every_worker_status() -> None:
         "opening camera": "STARTING",
         "ready": "LEFT",
         "reconnecting": "RECONNECTING",
+        "no picture": "NO PICTURE",
         "camera error": "CAMERA ERROR",
         "stopped": "GESTURE OFF",
     }
@@ -83,6 +86,7 @@ def test_health_line_covers_every_worker_status() -> None:
         "opening camera": "GESTURE CONTROL: STARTING",
         "ready": "GESTURE CONTROL: READY",
         "reconnecting": "CAMERA RECONNECTING",
+        "no picture": "CAMERA: NO PICTURE",
         "camera error": "CAMERA ERROR",
         "stopped": "GESTURE CONTROL: OFF",
     }
@@ -164,6 +168,25 @@ def test_the_small_print_names_the_processor_and_fits_the_panel(
     line = diagnostics_text(snapshot, 999.9)
     assert shown in line
     assert app.small.size(line)[0] <= INNER_WIDTH, line
+
+
+def test_a_camera_without_a_picture_is_explained_not_shown(app: GesturePacman) -> None:
+    """Black or static frames are never drawn; the panel says what is wrong and what to check."""
+    blocked = snap("no picture", None)
+    assert command_color(command_text(blocked, False, True), app.theme) == app.theme.error
+    assert status_color(control_status(blocked, False, True), app.theme) == app.theme.error
+    assert loading_text(blocked, True, app.theme) == (
+        "Camera sends no picture - check its switch or cover",
+        app.theme.error,
+    )
+    for line in NO_PICTURE_HINTS:
+        assert app.small.size(line)[0] <= INNER_WIDTH, line
+
+    assert app.controller is not None
+    app.preview_surface = pygame.Surface((10, 10))  # a stale frame from before the blackout
+    app.controller.state.publish(status="no picture", camera_ok=False, preview=None)
+    app.draw()
+    assert app.preview_surface is None, "the stale frame must not stay on screen"
 
 
 def test_static_text_is_rebuilt_only_when_the_theme_changes(app: GesturePacman) -> None:

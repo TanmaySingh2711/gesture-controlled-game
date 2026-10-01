@@ -180,7 +180,14 @@ class FakeCapture:
 @pytest.mark.parametrize(
     ("opened", "frame", "passed", "detail"),
     [
-        (True, np.zeros((480, 640, 3), np.uint8), True, "captured a 640x480 frame"),
+        (True, np.full((480, 640, 3), 110, np.uint8), True, "captured a 640x480 frame"),
+        (True, np.zeros((480, 640, 3), np.uint8), False, "its picture is black"),
+        (
+            True,
+            np.random.default_rng(0).integers(0, 256, (480, 640, 3), np.uint8),
+            False,
+            "its picture is static",
+        ),
         (True, None, False, "no frame was returned"),
         (False, None, False, "could not open the default webcam"),
     ],
