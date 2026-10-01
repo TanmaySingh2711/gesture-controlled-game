@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]  # 77 is the first release that reads the SPDX `license` field
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,9 @@ version = "1.0.0"
 description = "A Pac-Man-style maze game controlled by hand gestures recognised in real time by a MobileNetV2 CNN."
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tanmay Singh" }]
 # Runtime dependencies live in requirements/cuda.txt, because PyTorch must come from the PyTorch
 # CUDA index rather than PyPI. They are deliberately not duplicated here, so there is exactly
 # one place that pins them. Install with:

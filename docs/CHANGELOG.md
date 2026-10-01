@@ -16,6 +16,9 @@ each verified before the next began; the entries below follow those phases.
   with the fix, when a Windows path is too long for PyTorch to install, or when `venv/` was
   created in another folder (its command shortcuts then point at the old folder and fail
   silently); `--fresh` rebuilds it.
+- **One-click scripts:** `setup.bat` (Windows) and `setup.sh` (macOS, Linux) find Python 3.12
+  and run `install.py`; `run_game.bat` starts the game by double-click. CI's one-click setup jobs
+  run these scripts themselves.
 - **Environment check** now loads the real model and times a frame on the chosen device; a missing
   GPU is information, not a failure.
 - **Robustness evaluation:** `src/evaluate_robustness.py` re-scores the 2,000 unseen-people images

@@ -2,306 +2,535 @@
 
 [![CI](https://github.com/TanmaySingh2711/gesture-controlled-game/actions/workflows/ci.yml/badge.svg)](https://github.com/TanmaySingh2711/gesture-controlled-game/actions/workflows/ci.yml)
 
-A Pac-Man-style maze game you steer with your hand. A MobileNetV2 CNN recognises four gestures from
-a webcam in real time, and the game turns them into moves.
+A Pac-Man-style maze game that you steer with hand gestures in front of a webcam.
 
-| Gesture | Command |
+| Gesture | Pac-Man goes |
 |---|---|
-| Closed fist | **LEFT** |
-| Open palm | **RIGHT** |
-| Thumbs up | **UP** |
-| Thumbs down | **DOWN** |
+| Closed fist | LEFT |
+| Open palm | RIGHT |
+| Thumbs up | UP |
+| Thumbs down | DOWN |
 
-```bash
-python install.py                       # one-time setup: venv, libraries, project, self-check
-python src/play_gesture.py              # play with gestures (the keyboard still works)
-python src/play_gesture.py --no-camera  # keyboard only, no webcam needed
+## Table of Contents
+
+- [Overview](#overview)
+- [Problem Statement](#problem-statement)
+- [Objectives](#objectives)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [How It Works](#how-it-works)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [How to Run](#how-to-run)
+- [Usage](#usage)
+- [Example Output](#example-output)
+- [Model Details](#model-details)
+- [Dataset](#dataset)
+- [Results](#results)
+- [Limitations](#limitations)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+- [Author](#author)
+- [Credits](#credits)
+
+## Overview
+
+This is a maze game in the style of Pac-Man. You eat pellets, avoid four ghosts and clear rounds.
+
+The difference is how you steer. A webcam watches your hand. A small neural network looks at each
+frame and decides which of four gestures you are showing. The game turns that into a direction.
+
+The keyboard works at the same time, so you can always fall back to the arrow keys. You can also
+play with the keyboard only, with no webcam at all.
+
+The trained model is included in the repository, so the game works right after setup. You do not
+need to download a dataset or train anything.
+
+## Problem Statement
+
+Games are usually played with a keyboard, a mouse or a controller. This project tries a
+different input: your bare hand in front of an ordinary webcam.
+
+That sounds simple, but it has real problems to solve:
+
+- The model must be right almost every time. One wrong reading sends Pac-Man into a ghost.
+- It must be fast. A turn that arrives late is a missed turn.
+- A slow camera frame must never slow the game down.
+- An empty frame or a relaxed hand must not turn Pac-Man by accident.
+
+## Objectives
+
+- Recognise four hand gestures from a live webcam, reliably.
+- Turn those gestures into game moves with little delay.
+- Keep the game at 60 frames per second while recognition runs beside it.
+- Stay playable without an NVIDIA GPU, and without a webcam.
+- Measure the results honestly, including where the model fails.
+
+## Key Features
+
+**The game**
+
+- **Original maze** – a 28 x 31 maze with 330 pellets and 4 power pellets.
+- **Four ghosts** – each one chases in its own way: the Chaser, the Ambusher, the Flanker and
+  the Drifter.
+- **Classic rules** – power pellets, frightened ghosts, bonus fruit, 3 lives, an extra life at
+  10,000 points, and rounds that get harder.
+- **Saved high score** – your best score, colour theme and sound setting are remembered.
+- **Sound effects** – short sounds for pellets, ghosts and lost lives. They can be muted.
+
+**Gesture control**
+
+- **Four gestures** – fist, open palm, thumbs up and thumbs down.
+- **Keyboard always works** – arrow keys and WASD work together with gestures.
+- **Camera panel** – a side panel shows what the camera sees and the command in use.
+- **Protection from wrong turns** – a gesture must be confident, and must hold for 3 of the last
+  5 frames, before it becomes a command.
+- **Camera recovery** – if the webcam stops, the game tries to reconnect. If that fails, you
+  keep playing on the keyboard.
+
+**Other**
+
+- **Runs without a GPU** – the model uses an NVIDIA GPU when there is one, and the CPU otherwise.
+- **Accessibility** – three colour themes (classic, high contrast, colour-blind safe). Nothing
+  in the game depends on colour alone.
+- **One-click setup** – a single script creates the environment and checks that it works.
+- **Model file protection** – the model file is checked against a fixed checksum before loading.
+
+## Tech Stack
+
+| Area | What is used |
+|---|---|
+| Language | Python 3.12 |
+| Game | Pygame |
+| Model | PyTorch and torchvision (MobileNetV2) |
+| Camera and image handling | OpenCV, Pillow, NumPy |
+| Evaluation and plots | scikit-learn, Matplotlib |
+| Tests | pytest, pytest-cov, Hypothesis |
+| Code quality | ruff (format and lint), mypy (types), pre-commit, pip-audit |
+| CI | GitHub Actions on Windows, macOS and Linux |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    cam[Webcam] --> worker["Recognition thread<br/>mirror, crop, model, threshold, smoothing"]
+    worker -- latest result --> ctrl[Gesture controller]
+    keys[Keyboard] --> seam
+    ctrl -- direction request --> seam[Direction request]
+    seam --> game["Game loop, 60 FPS"]
 ```
 
-No NVIDIA GPU is needed: the model runs on the CPU in about 12 ms per frame, well inside the
-webcam's 33 ms frame interval.
+There are two loops, and they never wait for each other:
 
-## At a glance
+- **The recognition thread** owns the webcam and the model. It reads a frame, runs the model and
+  publishes the result.
+- **The main thread** runs the game: input, movement, ghosts and drawing.
 
-| | |
-|---|---|
-| Held-out test accuracy | **99.0%** (198/200), Wilson 95% interval **96.4%-99.7%** |
-| Unseen people | **99.6%** (1,992/2,000) from 1,727 people with no image in the dataset, 95% interval 99.2%-99.8% |
-| Calibration | expected calibration error **0.005** - confidence can be taken at face value |
-| Live recognition | threshold 0.90 and 3-of-5 smoothing, both frozen from webcam trials |
-| Live performance | game **60 FPS** beside a **30 FPS** recogniser, no backlog over a 330 s run (GPU) |
-| Runs without a GPU | CPU fallback: **12 ms** per frame, same predictions as the GPU on all 200 validation images |
-| Changing gesture | from starting to move the hand to a stable new command: **1.3 s** median in the published run (0.8-1.6 s), **2.9 s** in an earlier attempt (1.1-15 s); **143 ms** of it is the recognizer's own decision time, the rest is the hand moving |
-| Memory | game **47 MB**, flat over 10 simulated minutes; recognizer **22 MB** GPU peak, no growth over 5,000 frames on GPU or CPU |
-| Automated tests | 470+ pytest tests and the self-test scripts; **94% coverage** (lines and branches) without a GPU or the dataset, and CI fails below 90% |
-| Camera conditions | 97.9-99.4% under dim light, colour casts, JPEG, low resolution and a tilted hand; drops to 94% with harsh light, 77% with strong blur and 59% with heavy dark-room noise (simulated, [MODEL_CARD.md](docs/MODEL_CARD.md#robustness-to-simulated-camera-conditions)) |
-| Known limitations | no reject class: a deliberate unsupported gesture (e.g. a peace sign) can be read as a direction - use only the four. Play in a lit room: webcam noise in the dark causes confident misreads |
+They share only the latest result. Old results are thrown away, never queued. So a slow camera
+frame cannot slow the game.
 
-Status: the project passed final testing and manual acceptance ([FINAL_TEST_REPORT.md](docs/FINAL_TEST_REPORT.md)).
-A later quality round added accessibility, security hardening, statistical rigour, a proper test
-suite and tooling; see [CHANGELOG.md](docs/CHANGELOG.md).
+Gestures and the keyboard both go through the same direction request. Neither moves Pac-Man
+directly. The game code in `game/` does not import PyTorch or OpenCV at all.
 
-## How to play
+More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-| Key | Action |
-|---|---|
-| Arrows / WASD | Move |
-| P | Pause |
-| H or F1 | Help |
-| C | Colour theme: classic, high contrast, colour-blind safe |
-| M | Sound on / off |
-| R | Restart after Game Over |
-| ESC | Quit |
+## How It Works
 
-Keep your hand inside the box shown in the camera panel. `None` - no confident gesture - never
-stops Pac-Man; he keeps going the way he was. Hold a gesture a moment before a junction and the
-turn is taken when it becomes possible.
+1. The webcam gives a 640 x 480 frame.
+2. The frame is mirrored, so moving your hand right moves it right on screen.
+3. A fixed 300 x 300 box is cut out of the frame. This is the area where you hold your hand.
+4. The box is resized to 160 x 160 and given to the model.
+5. The model returns a score for each of the four gestures.
+6. If the best score is below 0.90, the frame is ignored.
+7. A gesture becomes a command only after it wins 3 of the last 5 frames.
+8. The command is sent to the game as a direction request.
+9. Pac-Man takes the turn at the next place where that turn is possible.
 
-## Setup
+When there is no confident gesture, nothing happens. Pac-Man keeps moving the way he was going.
+He never stops on his own.
 
-Python 3.12 (64-bit) on Windows, macOS or Linux. A webcam for gesture control. An NVIDIA GPU is
-optional. On a minimal Linux install, OpenCV also needs the `libgl1` system package
-(`sudo apt-get install libgl1`); desktop distributions already have it.
+## Project Structure
 
-```bash
-python install.py          # players
-python install.py --dev    # developers: also the test, lint and type-check tools
+```text
+gesture-controlled-game/
+├── README.md  LICENSE
+├── install.py                # one-command setup
+├── setup.bat  setup.sh       # one-click wrappers around install.py
+├── run_game.bat              # double-click to play (Windows)
+├── pyproject.toml            # packaging and tool settings
+├── game/                     # the game itself (Pygame only, no model code)
+│   ├── engine.py             # rules, rounds, drawing
+│   ├── maze.py  player.py  ghost.py  entity.py  controls.py
+│   ├── theme.py  audio.py  profile.py
+│   └── main.py               # keyboard-only launcher and self-test
+├── src/                      # gesture recognition, training and evaluation
+│   ├── play_gesture.py       # the full application
+│   ├── gesture_recognizer.py # model, threshold and smoothing
+│   ├── game_integration.py   # recognition thread and gesture controller
+│   ├── realtime_gesture.py   # live preview and trial recorder
+│   ├── train_model.py  data_pipeline.py  model_study.py
+│   ├── evaluate_model.py  evaluate_external.py  evaluate_robustness.py
+│   ├── crop_hagrid_hands.py  audit_hagrid_lineage.py  collect_dataset.py
+│   ├── environment_check.py  live_report.py  measure_memory.py
+│   └── check_*.py            # standalone self-test scripts
+├── tests/                    # pytest suite
+├── requirements/             # cuda.txt, cpu.txt, dev.txt
+├── model/                    # the trained model and its training history
+├── dataset/                  # image folders (images not in git), split and class mapping
+├── dataset_external/         # list of the extra test images (images not in git)
+├── reports/                  # evaluation results and figures
+└── docs/                     # architecture, model card, dataset card and more
 ```
 
-`install.py` creates `venv/`, installs the CUDA build of PyTorch (`requirements/cuda.txt`) when it finds
-an NVIDIA GPU and the CPU build (`requirements/cpu.txt`) otherwise, installs the project, and runs
-`src/environment_check.py`, which loads the real model and times a frame on your machine. After
-moving the project folder, run `python install.py --fresh`: a venv keeps pointing at the folder it
-was created in, and the installer says so instead of letting commands fail mysteriously. On
-Windows it also stops early, with the fix, if the folder's path is too long for PyTorch to install.
+Tool caches and coverage files go into a `.cache/` folder. It is ignored by git and safe to
+delete.
 
-The recognizer uses the GPU when there is one and the CPU otherwise; `--device cpu` or
-`--device cuda` on `play_gesture.py` and `realtime_gesture.py` forces one. Only retraining the
-model (`src/train_model.py`) requires CUDA.
+## Requirements
+
+- **Python 3.12, 64-bit.** The setup script checks this and stops on any other version.
+- **Windows, macOS or Linux.**
+- **A webcam**, for gesture control. Not needed for keyboard play.
+- **An internet connection for setup.** With an NVIDIA GPU, the PyTorch download alone is about
+  2 GB. The CPU version is much smaller.
+
+An NVIDIA GPU is optional. Without one, the model runs on the CPU.
+
+On a minimal Linux install, OpenCV also needs one system package:
+
+```bash
+sudo apt-get install libgl1
+```
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/TanmaySingh2711/gesture-controlled-game.git
+cd gesture-controlled-game
+```
+
+Then run the setup. Pick the way that suits you.
+
+**Windows, without a terminal:** double-click `setup.bat`.
+
+**macOS or Linux:**
+
+```bash
+bash setup.sh
+```
+
+**Any system, from a terminal:**
+
+```bash
+python install.py
+```
+
+All three do the same thing:
+
+1. Create a virtual environment in `venv/`.
+2. Install PyTorch with GPU support if an NVIDIA GPU is found, or the CPU version otherwise.
+3. Install the other libraries and the project itself.
+4. Run a check that loads the model and times it on your machine.
+
+Useful options:
+
+| Command | What it does |
+|---|---|
+| `python install.py --dev` | Also installs the test and code-quality tools |
+| `python install.py --cpu` | Uses the CPU version of PyTorch even if a GPU is found |
+| `python install.py --fresh` | Rebuilds `venv/` from scratch. Use it after moving the project folder |
 
 <details>
 <summary>Manual setup</summary>
 
 ```bash
 python -m venv venv
-venv\Scripts\activate                 # Windows  (source venv/bin/activate elsewhere)
-pip install -r requirements/cuda.txt       # NVIDIA GPU (CUDA build);  or: -r requirements/cpu.txt
-pip install -r requirements/dev.txt   # testing and quality tools
-pip install -e . --no-deps            # makes the `game` and `src` packages importable
-python src/environment_check.py       # verifies Python, libraries, the model and the webcam
+venv\Scripts\activate                     # Windows (use: source venv/bin/activate elsewhere)
+pip install -r requirements/cuda.txt      # NVIDIA GPU. Without one: requirements/cpu.txt
+pip install -e . --no-deps
+python src/environment_check.py
 ```
 
 </details>
 
-## Architecture
+## Configuration
 
-```mermaid
-flowchart LR
-    cam[Webcam] --> worker["Recognition worker<br/>mirror - ROI - CNN - threshold - smoothing"]
-    worker -- latest snapshot --> ctrl[GestureController]
-    keys[Keyboard] --> seam
-    ctrl -- request_direction --> seam[Buffered direction request]
-    seam --> game["Game engine, 60 FPS"]
+There is nothing you must configure. The project uses no API keys, no accounts and no `.env`
+file.
+
+**Command-line options** for `src/play_gesture.py`:
+
+| Option | Meaning |
+|---|---|
+| `--no-camera` | Keyboard only. The model and webcam are not loaded |
+| `--device auto\|cuda\|cpu` | Where the model runs. Default is `auto` |
+| `--benchmark FRAMES` | Run for a number of frames, print a speed report and exit |
+| `--threshold VALUE` | Change the 0.90 confidence threshold, for testing |
+| `--log-level LEVEL` | `DEBUG`, `INFO`, `WARNING` or `ERROR` |
+
+**Optional environment variables:**
+
+| Variable | Meaning |
+|---|---|
+| `GESTURE_PACMAN_HOME` | Folder for the saved profile. Default is `~/.gesture_pacman/` |
+| `GESTURE_WEBCAM_TESTS=1` | Also run the tests that need a real webcam |
+
+## How to Run
+
+**Windows:** double-click `run_game.bat`.
+
+**From a terminal**, after activating the environment
+(`venv\Scripts\activate` on Windows, `source venv/bin/activate` elsewhere):
+
+```bash
+python src/play_gesture.py               # gestures and keyboard
+python src/play_gesture.py --no-camera   # keyboard only
+python game/main.py                      # the plain game, without the gesture panel
 ```
 
-- **Two loops that never wait for each other.** One worker thread owns the webcam and the model;
-  the main thread runs the game. They share a single immutable snapshot, never a queue, so a slow
-  camera frame cannot slow the game.
-- **One input seam.** Gestures and the keyboard both call `game.request_direction`; neither moves
-  Pac-Man directly, and the most recent request wins.
-- **The game knows nothing about the CNN.** Nothing in `game/` imports `torch`, `cv2` or `src`, and
-  the game's self-test fails if that ever changes.
+A game window opens. There is no web page or server to open.
 
-Details, including every timing constant and the evidence behind it, are in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## Usage
 
-## The game
+1. Start the game. A start screen shows the four gestures.
+2. Wait until the camera is ready, then press **SPACE** or **ENTER**.
+3. Sit about an arm's length from the webcam, in a well-lit room.
+4. Hold your hand inside the box shown in the camera panel on the right.
+5. Show a gesture to turn. The panel shows the command that is steering Pac-Man.
+6. Hold the gesture a moment before a junction. Pac-Man turns when the turn becomes possible.
 
-An original 28 x 31 maze with 330 pellets and 4 power pellets, every pellet reachable and no dead
-ends. Four ghosts share one navigation rule but aim differently: the Chaser targets Pac-Man, the
-Ambusher cuts him off ahead, the Flanker pincers opposite the Chaser, and the Drifter keeps breaking
-away. The Chaser speeds up as the board empties, but every ghost stays slower than Pac-Man, so the
-game stays fair at gesture latency.
+Use only the four gestures. Other hand shapes can be mistaken for one of them.
+
+**Keyboard:**
+
+| Key | Action |
+|---|---|
+| Arrow keys / WASD | Move |
+| P | Pause |
+| H or F1 | Help |
+| C | Change colour theme |
+| M | Sound on / off |
+| R | Restart after Game Over |
+| ESC | Quit |
+
+**Scoring:**
+
+| Item | Points |
+|---|---|
+| Pellet | 10 |
+| Power pellet | 50 |
+| Ghosts eaten in a row | 200, 400, 800, 1600 |
+| Bonus fruit | 100 to 5000 |
+
+## Example Output
+
+The setup check, `python src/environment_check.py --skip-webcam`, on a laptop with an NVIDIA
+RTX 3050 Ti (shortened):
+
+```text
+[PASS] Python             3.12.10
+[PASS] PyTorch            version 2.14.0+cu130
+[PASS] CUDA available     True (CUDA runtime 13.0, cuDNN 92400)
+...
+[PASS] OpenCV             version 5.0.0
+[PASS] Gesture model      checksum verified, 11.5 ms per frame on cuda
+[PASS] Pygame             version 2.6.1
+...
+RESULT: PASS (all 14 checks passed)
+```
+
+A speed report, `python src/play_gesture.py --benchmark 600 --device cpu`, on the same laptop
+using only the CPU (shortened):
+
+```text
+game: 600 frames | 58.0 FPS | frame p95 20.0 ms
+camera: 167 frames | 26.8 FPS | CNN mean 12.42 ms | median 12.39 | p95 14.42 | reconnects 0
+...
+worker stopped cleanly: True
+```
+
+## Model Details
 
 | | |
 |---|---|
-| Player | 6.2 tiles/s, turns buffered for 0.35 s |
-| Ghosts | 5.4 tiles/s, +0.2 per round, capped at 6.0; states house, scatter, chase, frightened, eaten |
-| Scoring | pellet 10, power pellet 50, ghosts 200/400/800/1600, fruit 100-5000, extra life at 10,000 |
-| Rendering | static maze pre-rendered once per theme - **0.58 ms** per headless frame |
-| Persistence | high score, theme and mute saved to `~/.gesture_pacman/profile.json` (atomic writes) |
+| Model | MobileNetV2 from torchvision, pretrained on ImageNet, with a new 4-way output layer |
+| Size | 2,228,996 parameters, about 9 MB on disk |
+| Input | A 160 x 160 colour image of the hand area |
+| Output | A score for each of `left`, `right`, `up`, `down` |
+| File | `model/best_direction_model.pt` |
 
-```bash
-python game/main.py              # the keyboard game on its own
-python game/main.py --selftest   # rule and separation checks
-```
+**Training** was done in two stages on 1,600 images:
 
-## Accessibility
+1. Train only the new output layer, with the rest of the network frozen.
+2. Unfreeze the last blocks and fine-tune them with a lower learning rate.
 
-- **Three colour themes**, switched with `C` and remembered. Tests check every theme's text against
-  its backgrounds for WCAG 2.1 contrast of at least 4.5:1.
-- **Colour-blind safe palette** based on Okabe-Ito, tested under simulated protanopia,
-  deuteranopia and tritanopia so frightened ghosts stay distinct from dangerous ones.
-- **Nothing depends on colour alone:** frightened ghosts also change shape, power pellets are larger
-  and pulse, and every direction is labelled in text.
-- **Sound cues** for pellets, power pellets, ghosts, lost lives and cleared rounds, for players
-  watching their hand rather than the maze. Fully optional, and silent when no audio device exists.
+The best version was picked by validation loss. Training images were flipped left-right,
+slightly rotated, shifted and brightened at random. They were never flipped upside down,
+because that would turn a thumbs up into a thumbs down.
 
-## The model
+**At run time**, two rules sit on top of the model:
 
-MobileNetV2 with ImageNet weights and a four-way head, trained in two stages on the RTX 3050 Ti:
-the head alone, then the last blocks fine-tuned, selected on validation loss. The test split was
-never loaded during training and was evaluated exactly once.
+- A frame counts only if the model is at least 90% confident.
+- A gesture becomes a command only if it wins 3 of the last 5 frames.
 
-| Result | Value |
-|---|---|
-| Validation accuracy / loss | 99.5% (199/200) / 0.036 |
-| Test accuracy | **99.0%** (198/200), Wilson 95% interval 96.4%-99.7% |
-| Macro-F1 | 0.990, bootstrap 95% interval 0.974-1.000 |
-| Calibration | ECE 0.005, Brier score 0.016, NLL 0.029 |
-| At the live 0.90 threshold | 98% of test images accepted, 99.5% of those correct |
-| Errors | `right` read as `down` (conf 0.60), `down` read as `up` (conf 0.90) |
-| GPU latency, batch 1 | 6.0 ms mean (CPU: about 12 ms per webcam frame, preprocessing included) |
+Both settings were chosen from live webcam trials, not from the test images.
 
-The two errors are exactly why smoothing exists: the confident `down`-as-`up` passes the threshold,
-but a single frame cannot win a 3-of-5 vote.
-
-```bash
-python -m src.analyze_evaluation   # confidence intervals and calibration from the saved predictions
-python src/train_model.py          # retrain (overwrites the frozen checkpoint - see docs/SECURITY.md)
-```
-
-The confidence intervals matter: with 200 test images, "99%" alone overstates what is known.
-A lineage audit found that 41% of test images come from people also in training, because the
-dataset was split per image, not per person. So the frozen model was also evaluated once on
-2,000 images from 1,727 people it has never seen. It scored **99.6%** (interval 99.2%-99.8%), so
-familiar hands did not inflate the result. See [docs/MODEL_CARD.md](docs/MODEL_CARD.md) and
-[docs/DATASET_CARD.md](docs/DATASET_CARD.md).
-The calibration diagram is in `reports/reliability_diagram.png`.
-
-A 42-run study on train and validation only compared six backbones and nine fine-tuning recipes,
-each over three seeds. No backbone was clearly better than MobileNetV2: ResNet-18's validation loss
-was within one standard deviation, with five times the parameters. The frozen run's validation loss
-(0.036) sits inside MobileNetV2's seed range (0.032-0.051), so it was a typical result, not a lucky
-one. See [docs/MODEL_STUDY.md](docs/MODEL_STUDY.md).
-
-## Live recognition
-
-| Setting | Value | Why |
-|---|---|---|
-| Threshold | 0.90 | Intentional gestures never below 0.961 live; idle and absent hands never above 0.617 |
-| Smoothing | 3 of 5 frames | Stops a single confident wrong frame from turning Pac-Man |
-| ROI | 300 x 300 of a mirrored 640 x 480 frame | Matches how the training crops were built |
-
-Live trials, one webcam and one room (how many people took part was not recorded):
-
-| Trial | Result |
-|---|---|
-| Held gestures | 80/80 recognised |
-| Idle or absent hand | 0/40 false commands |
-| Gesture changes, published run | 6 changes: none passed through a wrong command; 0.8-1.6 s each |
-| Gesture changes, first attempt | 12 changes, 4 minutes earlier with the same settings: **2 passed through a wrong command** on the way (right->up briefly gave DOWN, left->right briefly gave UP), and 6 took over 3 s (up to 15 s) |
-
-Both transition runs are kept in `reports/p6_live/` (`live_direction_transitions.csv` and
-`live_direction_transitions_firstattempt.csv`). Taken together, 2 of 18 changes briefly issued a
-wrong command, so a wrong turn during a quick change is possible, if uncommon.
-
-```bash
-python src/realtime_gesture.py              # live preview with overlay
-python src/realtime_gesture.py --selftest   # checks against the real camera
-python src/realtime_gesture.py --trials     # guided trial recorder
-python src/realtime_gesture.py --trials --participant NAME --condition dim-room   # label a session
-python -m src.live_report --include-p6      # every session, per person and per room
-```
-
-Sessions are saved to `reports/live_sessions/`, one file each, and never overwrite the P6 records.
-[MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md#6-recording-evidence-with-several-people-and-rooms)
-has the protocol for testing with several people and rooms.
-
-## Security
-
-The model file is verified against a pinned SHA-256 and loaded with `torch.load(weights_only=True)`,
-so a tampered or malicious checkpoint cannot load or run code; its class mapping must also match.
-See [SECURITY.md](docs/SECURITY.md) for the full threat model.
+More detail: [docs/MODEL_CARD.md](docs/MODEL_CARD.md) and
+[docs/MODEL_STUDY.md](docs/MODEL_STUDY.md), which compares six network types and finds none
+clearly better than MobileNetV2.
 
 ## Dataset
 
-2,000 hand-region crops from [HaGRID](https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p)
-(CC-BY-SA-4.0), 500 per class: `fist`, `palm`, `like` and `dislike`. Each crop is the official
-bounding box padded 25% and squared, to resemble the webcam's hand region. Thumbs-up and thumbs-down
-come from their own classes, never by rotating one into the other, and training augmentation never
-flips vertically.
+The images come from [HaGRID](https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p),
+a public hand-gesture dataset (CC-BY-SA-4.0).
+
+- **2,000 images**, 500 per gesture, from the HaGRID classes `fist`, `palm`, `like` and `dislike`.
+- Each image is cut down to the hand, using the bounding box that comes with HaGRID, with some
+  padding around it. This makes the images look like the webcam's hand area.
+- **Split:** 1,600 for training, 200 for validation, 200 for testing.
+
+The images are not stored in this repository. You only need them to retrain or re-evaluate the
+model. To rebuild them:
 
 ```bash
-python src/crop_hagrid_hands.py --promote          # build the dataset (reads the archive by range requests)
-python src/check_dataset.py --grid --updown-grid   # integrity checks and QA sheets
-python src/check_data_pipeline.py                  # split, transform and determinism checks
+python src/crop_hagrid_hands.py --promote   # downloads only the images it needs
+python src/check_dataset.py                 # checks the result
 ```
 
-The split is 1600/200/200, stratified with seed 42, and reproducible byte for byte.
+A second set of 2,000 images, from 1,727 people who do not appear in the dataset at all, is
+used to test the model on new hands.
+
+More detail: [docs/DATASET_CARD.md](docs/DATASET_CARD.md).
+
+## Results
+
+All numbers below come from files in `reports/` and `model/`.
+
+**Accuracy**
+
+| Test | Result |
+|---|---|
+| Test images (200, never used in training) | 99.0% (198 of 200). 95% range: 96.4% to 99.7% |
+| People the model has never seen (2,000 images) | 99.6% (1,992 of 2,000). 95% range: 99.2% to 99.8% |
+| Macro F1 on the test images | 0.990 |
+
+![Confusion matrix on the test images](reports/p5_evaluation/direction_confusion_matrix.png)
+
+![Training curves](model/direction_training_curves.png)
+
+**Speed**
+
+| Measure | Result |
+|---|---|
+| Model on an RTX 3050 Ti | 6.0 ms per image |
+| Model on the CPU, full webcam frame | about 12 ms |
+| Game and camera over a 330 second run | 60 FPS game, 30 FPS camera |
+| Memory | 47 MB for the game; 22 MB peak GPU memory for the model |
+
+**Live webcam trials** (one webcam, one room)
+
+| Trial | Result |
+|---|---|
+| Holding a gesture | 80 of 80 recognised |
+| Empty box or relaxed hand | 0 false commands in 40 trials |
+| Changing from one gesture to another | 2 of 18 changes passed through a wrong command |
+| Time for a whole gesture change | median 1.3 s in one run, 2.9 s in an earlier one |
+
+Most of that change time is the hand moving. Once the model first sees the new gesture, it takes
+143 ms on average to make it a command.
+
+**Camera conditions** (simulated on the 2,000 unseen-people images)
+
+| Condition | Accuracy |
+|---|---|
+| Normal | 99.6% |
+| Dim light, colour casts, heavy JPEG, low resolution, tilted hand | 97.9% to 99.4% |
+| Very bright light | 94.0% |
+| Moderate camera noise | 94.3% |
+| Strong blur | 76.7% |
+| Heavy camera noise, as in a dark room | 58.6% |
+
+**Tests:** about 510 automated tests. Coverage is 94% when run without a GPU or the dataset, and
+CI fails if it drops below 90%.
+
+## Limitations
+
+- **Only four gestures.** There is no "none of these" class. A clear gesture outside the four,
+  such as a peace sign, can be read as one of them.
+- **Dark rooms cause errors.** Camera noise in low light leads to confident wrong readings. Play
+  in a lit room.
+- **Fast hand movement blurs the image**, and accuracy drops with strong blur.
+- **Changing gestures takes about a second.** You need to show the next gesture a little early.
+- **Fixed hand position.** Your hand must be inside the box on the right side of the frame.
+- **Live testing was small.** It used one webcam in one room. The number of people who took
+  part was not recorded.
+- **macOS and Linux** are covered by automated setup and tests, not by live webcam play.
+- **Retraining needs an NVIDIA GPU** and the dataset images. Playing does not.
+- **Python 3.12 only.**
 
 ## Development
 
+Install the tools with `python install.py --dev`, then:
+
 ```bash
-pytest                               # every test, including the self-test scripts; GPU, webcam and
-                                     # dataset tests skip themselves when those are absent
-pytest --cov=game --cov=src          # with coverage (fails below 90%)
-pytest -m "not slow"                 # quick loop while editing
 ruff format . && ruff check .        # formatting and lint
-mypy game src tests install.py       # static types
-python -m src.measure_memory --game  # memory profile (--recognizer for the CUDA model)
-python -m src.evaluate_external      # frozen model on unseen people (after the lineage audit)
-python -m src.evaluate_robustness    # the same people under simulated lighting, blur and noise
+mypy game src tests install.py       # type check
+pytest                               # all tests
+pytest --cov=game --cov=src          # with coverage
+pytest -m "not slow"                 # a faster run while editing
 ```
 
-CI runs eight checks on every push: lint (ruff), type check (mypy), the test suite with
-coverage on Windows, macOS and Linux (plus the dependency audit on Linux), and a one-click setup
-on all three - `python install.py` exactly as a new player runs it, then the game started from the
-environment it built. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the project rules that
-protect the reported results, and [MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for the checks
-that need a real hand.
+Tests that need a GPU, a webcam or the dataset images skip themselves when those are missing.
 
-## Project structure
+Other useful commands:
 
-```text
-gesture-controlled-game/
-├── README.md
-├── install.py                # one-command setup:  python install.py
-├── pyproject.toml            # packaging and every tool's settings
-├── game/                     # the game - Pygame only, no CNN
-│   ├── engine.py             # rules, rounds, drawing
-│   ├── maze.py  entity.py  player.py  ghost.py  controls.py
-│   ├── theme.py  audio.py  profile.py
-│   └── main.py               # keyboard launcher and self-test
-├── src/                      # recognition, training, evaluation and the application
-│   ├── play_gesture.py       # the application
-│   ├── game_integration.py  gesture_recognizer.py  realtime_gesture.py
-│   ├── data_pipeline.py  train_model.py  model_study.py
-│   ├── evaluate_model.py  analyze_evaluation.py  evaluate_external.py  evaluate_robustness.py
-│   ├── crop_hagrid_hands.py  audit_hagrid_lineage.py  collect_dataset.py
-│   ├── live_report.py  measure_memory.py  environment_check.py
-│   └── check_*.py            # the standalone self-test scripts
-├── tests/                    # the pytest suite
-├── requirements/             # cuda.txt (NVIDIA GPU), cpu.txt (everyone else), dev.txt (tools)
-├── model/                    # the frozen checkpoint and its training history and curves
-├── dataset/                  # 500 images per class (not in git), the frozen split and mapping
-├── dataset_external/         # the unseen-people test set (images not in git) and its manifest
-├── reports/                  # every analysis the project produced
-│   ├── p5_evaluation/        # the one test-split evaluation: metrics, predictions, figures
-│   ├── p6_live/              # the original live webcam trials
-│   ├── live_sessions/        # new live sessions, one file each (created when you record)
-│   └── qa/                   # QA image sheets from the check scripts (regenerated, not in git)
-├── docs/                     # architecture, model and dataset cards, model study, test plan,
-│                             # project spec, final test report, changelog, contributing, security
-└── .github/workflows/ci.yml  # lint, types, tests and one-click setup on Windows, macOS, Linux
+```bash
+python src/realtime_gesture.py        # live camera preview with the model's readings
+python src/realtime_gesture.py --trials --participant NAME --condition bright-room
+python -m src.live_report --include-p6   # combine recorded live sessions into one report
+python -m src.evaluate_robustness     # re-run the camera-conditions test
+python game/main.py --selftest        # check the game rules
 ```
 
-Everything the tools regenerate - the mypy, ruff, pytest and Hypothesis caches, coverage data
-and reports, downloaded HaGRID annotations - goes into one gitignored `.cache/` folder, which is
-safe to delete at any time. `pip install -e .` also leaves a `gesture_pacman.egg-info/` folder,
-which pip itself places in the project root; it is gitignored too.
+CI runs eight checks on every push: lint, type check, the tests on Windows, macOS and Linux, and
+a one-click setup on all three.
+
+## Contributing
+
+Contributions are welcome.
+
+1. Fork the repository.
+2. Create a branch: `git checkout -b my-change`
+3. Make your change.
+4. Run the checks from the [Development](#development) section.
+5. Commit with a message that says what changed, for example `fix: keep the camera error visible`.
+6. Push the branch and open a pull request.
+
+Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) first. It lists a few rules that
+protect the reported results, such as never re-running the evaluation on the test images.
+
+## License
+
+The code is released under the [MIT License](LICENSE).
+
+The HaGRID images used for training have their own license, CC-BY-SA-4.0. They are not part of
+this repository.
+
+## Author
+
+**Tanmay Singh** – [@TanmaySingh2711](https://github.com/TanmaySingh2711)
 
 ## Credits
 
-Hand images: HaGRID, Kapitanov et al., licensed CC-BY-SA-4.0. Model weights: torchvision's
-ImageNet-pretrained MobileNetV2. Maze, graphics and sound effects are original to this project.
+- **HaGRID** hand-gesture dataset by Kapitanov et al., used through the
+  [hagrid-sample-500k-384p](https://huggingface.co/datasets/cj-mills/hagrid-sample-500k-384p)
+  sample.
+- **MobileNetV2** with ImageNet weights from torchvision.
+- **Pygame**, **PyTorch** and **OpenCV**.
+
+The maze, graphics and sound effects were made for this project.

@@ -6,8 +6,8 @@ name: CI
 #   Type check (mypy)           static types
 #   Tests (3 operating systems) the pytest suite with coverage (fails below 90%); on Ubuntu also
 #                               the dependency audit
-#   One-click setup (3 OSes)    `python install.py` exactly as a new player runs it, then the
-#                               game started headless from the environment it built
+#   One-click setup (3 OSes)    setup.bat / setup.sh exactly as a new player runs them, then the
+#                               game started headless from the environment they built
 #
 # No runner has a GPU or a webcam, so everything runs on the CPU build of PyTorch - which is also
 # what players without an NVIDIA GPU install. Tests marked `gpu` skip themselves, and `webcam`
@@ -145,13 +145,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgl1
 
-      # The whole player setup: venv, CPU PyTorch (no GPU here), the project, and the
-      # environment check, which loads the real model and times a frame on the CPU.
-      - name: python install.py
-        run: python install.py
+      # The whole player setup, through the same scripts a player double-clicks: they find
+      # Python and run install.py, which builds venv/, installs CPU PyTorch (no GPU here) and the
+      # project, and runs the environment check - loading the real model and timing a frame.
+      - name: setup.bat (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call setup.bat || exit /b 1
 
-      - name: The game starts from the environment it built
+      - name: setup.sh (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: bash setup.sh
+
+      - name: The game starts from the environment it built (Windows, through run_game.bat)
+        if: runner.os == 'Windows'
+        shell: cmd
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then python=venv/Scripts/python.exe; else python=venv/bin/python; fi
-          "$python" src/play_gesture.py --no-camera --benchmark 120 --log-level WARNING
-          "$python" game/main.py --selftest
+          call run_game.bat --no-camera --benchmark 120 --log-level WARNING || exit /b 1
+          venv\Scripts\python.exe game\main.py --selftest
+
+      - name: The game starts from the environment it built (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          venv/bin/python src/play_gesture.py --no-camera --benchmark 120 --log-level WARNING
+          venv/bin/python game/main.py --selftest
