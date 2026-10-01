@@ -11,8 +11,23 @@ A Pac-Man-style maze game that you steer with hand gestures in front of a webcam
 | Thumbs up | UP |
 | Thumbs down | DOWN |
 
+## Quick Start
+
+You need Python 3.12. A webcam is needed only for gesture control.
+
+```bash
+git clone https://github.com/TanmaySingh2711/gesture-controlled-game.git
+cd gesture-controlled-game
+python install.py                        # one-time setup
+venv\Scripts\activate                    # Windows (elsewhere: source venv/bin/activate)
+python src/play_gesture.py               # play with gestures and keyboard
+```
+
+On Windows you can skip the terminal: double-click `setup.bat` once, then `run_game.bat`.
+
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Overview](#overview)
 - [Problem Statement](#problem-statement)
 - [Objectives](#objectives)
@@ -429,7 +444,7 @@ All numbers below come from files in `reports/` and `model/`.
 |---|---|
 | Model on an RTX 3050 Ti | 6.0 ms per image |
 | Model on the CPU, full webcam frame | about 12 ms |
-| Game and camera over a 330 second run | 60 FPS game, 30 FPS camera |
+| Game and camera over a 330 second run, with the GPU | 60 FPS game, 30 FPS camera |
 | Memory | 47 MB for the game; 22 MB peak GPU memory for the model |
 
 **Live webcam trials** (one webcam, one room)
