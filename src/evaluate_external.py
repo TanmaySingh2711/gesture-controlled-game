@@ -1,7 +1,7 @@
 """Evaluate the frozen model on people it has never seen: the unseen-subject HaGRID set.
 
 HaGRID was not split by person, so the P5 test split could share people with training, and its
-99% may partly reflect familiar hands. `dataset_external/`, built by
+99% may partly reflect familiar hands. `dataset/external/`, built by
 `python -m src.audit_hagrid_lineage --external 500`, holds crops from people with no image
 anywhere in `dataset/`, one image per person per class. Accuracy here is the better estimate of
 how the model does for a new player.
@@ -35,7 +35,7 @@ from src.evaluate_model import BATCH_SIZE, evaluate, load_model, write_predictio
 from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
-EXTERNAL_DIR: Final = PROJECT_ROOT / "dataset_external"
+EXTERNAL_DIR: Final = PROJECT_ROOT / "dataset" / "external"
 MANIFEST_PATH: Final = EXTERNAL_DIR / "manifest.json"
 DATASET_DIR: Final = PROJECT_ROOT / "dataset"
 REPORT_PATH: Final = PROJECT_ROOT / "reports" / "external_evaluation.json"
@@ -50,7 +50,11 @@ def load_entries(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         if label not in CLASS_TO_INDEX:
             raise ValueError(f"{relative}: unknown class {label!r}")
         entries.append(
-            {"path": f"dataset_external/{relative}", "label": CLASS_TO_INDEX[label], "class": label}
+            {
+                "path": f"dataset/external/{relative}",
+                "label": CLASS_TO_INDEX[label],
+                "class": label,
+            }
         )
     return entries
 
@@ -62,13 +66,16 @@ def md5_of(path: Path) -> str:
 def duplicates_of_dataset(
     entries: list[dict[str, Any]], root: Path | None = None, dataset_dir: Path | None = None
 ) -> list[str]:
-    """External images whose bytes also appear in `dataset/` - there must be none.
+    """External images whose bytes also appear in the training dataset - there must be none.
 
-    The folders default to PROJECT_ROOT and DATASET_DIR, looked up when called.
+    The folders default to PROJECT_ROOT and DATASET_DIR, looked up when called. The external set
+    lives inside `dataset/external/`, so that folder is left out of the comparison: otherwise
+    every external image would match itself.
     """
     root = root or PROJECT_ROOT
     dataset_dir = dataset_dir or DATASET_DIR
-    dataset = {md5_of(path) for path in dataset_dir.rglob("*.jpg")}
+    external = dataset_dir / "external"
+    dataset = {md5_of(path) for path in dataset_dir.rglob("*.jpg") if external not in path.parents}
     return [entry["path"] for entry in entries if md5_of(root / entry["path"]) in dataset]
 
 
@@ -107,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not MANIFEST_PATH.exists():
         print(
-            "ERROR: dataset_external/manifest.json not found - build it with "
+            "ERROR: dataset/external/manifest.json not found - build it with "
             "`python -m src.audit_hagrid_lineage --external 500`"
         )
         return 1
@@ -143,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     hits, total = int(predictions.correct.sum()), len(entries)
 
     report = rigor.analyse(predictions)
-    report["source"] = "dataset_external/ - unseen-subject HaGRID crops, frozen model, one pass"
+    report["source"] = "dataset/external/ - unseen-subject HaGRID crops, frozen model, one pass"
     report["provisional"] = not manifest.get("lineage_complete", False)
     report["provenance"] = {
         key: manifest.get(key)

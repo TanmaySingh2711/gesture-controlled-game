@@ -25,8 +25,8 @@ Outputs
 -------
     reports/dataset_lineage.json       dataset file -> HaGRID uuid, user_id, gesture
     reports/subject_leakage.json       people shared between train / val / test
-    dataset_external/<class>/*.jpg     unseen-subject evaluation images (gitignored)
-    dataset_external/manifest.json     their HaGRID uuids and user_ids
+    dataset/external/<class>/*.jpg     unseen-subject evaluation images (gitignored)
+    dataset/external/manifest.json     their HaGRID uuids and user_ids
 
 Usage::
 
@@ -64,7 +64,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = PROJECT_ROOT / "dataset"
 SPLITS_FILE = DATASET_DIR / "data_splits.json"
 REPORTS_DIR = PROJECT_ROOT / "reports"
-EXTERNAL_DIR = PROJECT_ROOT / "dataset_external"
+EXTERNAL_DIR = DATASET_DIR / "external"
 
 # Every run configuration that could have produced a class's shuffle order.
 RUN_CONFIGS: tuple[tuple[str, ...], ...] = (

@@ -150,7 +150,7 @@ Approved by the project owner after live play on 2026-09-13.
 | Gameplay mechanics work live | PASS |
 | Restart works | PASS |
 | Shutdown works | PASS |
-| Ready for college demonstration | PASS |
+| Ready to demonstrate | PASS |
 
 ## 9. Verdict
 

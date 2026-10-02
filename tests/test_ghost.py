@@ -371,3 +371,22 @@ def test_ghosts_never_leave_the_corridors(maze: Maze) -> None:
             assert ghost.can_walk(row, column), f"{ghost.role} inside a wall at {ghost.tile}"
             centre_x, centre_y = maze.tile_center(row, column)
             assert ghost.x == pytest.approx(centre_x) or ghost.y == pytest.approx(centre_y)
+
+
+# --- regressions ---------------------------------------------------------------------------
+def test_a_ghost_starts_at_the_round_one_speed(maze: Maze) -> None:
+    """Before any set_round() call, the base speed is the documented 5.4 tiles per second."""
+    assert Ghost(maze, "ambusher").base_speed == GHOST_BASE_SPEED
+
+
+@pytest.mark.parametrize("mode", [SCATTER, CHASE])
+def test_every_exit_from_the_house_adopts_the_global_mode(maze: Maze, mode: str) -> None:
+    """A ghost that was eaten and comes back out must not always return in CHASE."""
+    ghost = Ghost(maze, "ambusher")
+    ghost.rejoin_mode(mode)
+    ghost.released = True
+    for exit_number in (1, 2):
+        ghost.state = HOUSE
+        ghost.x, ghost.y = maze.tile_center(*HOUSE_EXIT)
+        ghost._arrival_checks()
+        assert ghost.state == mode, f"exit {exit_number} came out as {ghost.state}"

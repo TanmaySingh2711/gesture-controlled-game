@@ -79,7 +79,7 @@ environment, caches, dataset images, the unseen-subject test set and study weigh
 | `tests/` | The pytest suite |
 | `reports/` | Every analysis: calibration, model study, memory, robustness, lineage and leakage audit; `p5_evaluation/` and `p6_live/` hold the frozen test-split and live-trial records |
 | `model/` | The frozen checkpoint and its training history and curves |
-| `dataset/` | The images (not in git), the frozen split (`data_splits.json`) and class mapping |
+| `dataset/` | The images (not in git), the frozen split (`data_splits.json`) and class mapping; `external/` holds the unseen-people test set |
 | `requirements/` | `cuda.txt`, `cpu.txt` and `dev.txt` - the only place versions are pinned |
 | `docs/` | Architecture, model and dataset cards, model study, manual test plan, project spec, final test report, changelog, this file and the security notes |
-| `.cache/` | Every tool cache and coverage output (gitignored, safe to delete) |
+| `.cache/` | Everything regenerated: tool caches, coverage output, QA image sheets, study weights, the crop staging folder (gitignored, safe to delete) |

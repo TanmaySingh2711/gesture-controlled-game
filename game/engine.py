@@ -204,6 +204,7 @@ class Game:
         self.lives = START_LIVES
         self.round = 1
         self.extra_life_awarded = False
+        self.new_high_score = False
         self.state: str = READY
         self.state_timer = READY_SECONDS
         self.mode: str = SCATTER
@@ -220,6 +221,7 @@ class Game:
         self.lives = START_LIVES
         self.round = 1
         self.extra_life_awarded = False
+        self.new_high_score = False
         self.paused = False
         self.maze.reset_pellets()
         self.controls.clear()
@@ -324,6 +326,11 @@ class Game:
         self._update_modes(dt)
         self.player.update(dt, self.controls)
         self._eat_pellet()
+        # The last pellet wins the round at once. Letting the ghosts move first would allow a
+        # touch in the same frame to take a life from a round that is already cleared - and on
+        # the last life, to carry on playing with none.
+        if self._check_round_clear():
+            return
         self._update_fruit(dt)
 
         remaining = self.maze.pellets_remaining
@@ -333,7 +340,6 @@ class Game:
             ghost.update(dt, self.player, chaser)
 
         self._handle_collisions()
-        self._check_round_clear()
 
     def _update_modes(self, dt: float) -> None:
         """Advance frightened mode if it is running, otherwise the scatter/chase schedule."""
@@ -433,14 +439,19 @@ class Game:
         self.state = READY
         self.state_timer = READY_SECONDS
 
-    def _check_round_clear(self) -> None:
-        if self.maze.pellets_remaining == 0:
-            self.state = ROUND_CLEAR
-            self.state_timer = ROUND_CLEAR_SECONDS
-            self.audio.play("round")
+    def _check_round_clear(self) -> bool:
+        """End the round if the board is empty. True when it did."""
+        if self.maze.pellets_remaining != 0:
+            return False
+        self.state = ROUND_CLEAR
+        self.state_timer = ROUND_CLEAR_SECONDS
+        self.audio.play("round")
+        return True
 
     def _record_high_score(self) -> None:
-        if self.score > self.profile.high_score:
+        """Save a score that beats the old best. Equalling it is not a new high score."""
+        self.new_high_score = self.score > self.profile.high_score
+        if self.new_high_score:
             self.profile.high_score = self.score
             self.profile_store.save(self.profile)
 
@@ -764,7 +775,7 @@ class Game:
             return f"ROUND {self.round} CLEARED!", []
         if self.state == GAME_OVER:
             details = [f"Final Score: {self.score}", f"Round Reached: {self.round}"]
-            if self.score and self.score >= self.profile.high_score:
+            if self.new_high_score:
                 details.append("NEW HIGH SCORE!")
             return "GAME OVER", [*details, "", "Press R to Restart", "Press ESC to Quit"]
         return None

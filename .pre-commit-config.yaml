@@ -7,7 +7,7 @@ default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 # Frozen records (model/, the split files in dataset/, the P5 and P6 results) are excluded too:
 # whitespace fixers must never rewrite a byte of them.
-exclude: ^(dataset|dataset_external|model|reports/p5_evaluation|reports/p6_live|venv|\.cache)/
+exclude: ^(dataset|model|reports/p5_evaluation|reports/p6_live|venv|\.cache)/
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

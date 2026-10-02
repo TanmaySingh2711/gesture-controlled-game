@@ -18,7 +18,7 @@ CHECKPOINT = ROOT / "model" / "best_direction_model.pt"
 HAS_DATASET = any((ROOT / "dataset").rglob("*.jpg"))
 
 # check_data_pipeline.py regenerates its augmentation sample sheets on every run; they go to
-# reports/qa/, which is gitignored, so running it here leaves the working tree clean.
+# .cache/qa/, which is gitignored, so running it here leaves the working tree clean.
 SCRIPTS = [
     pytest.param(["game/main.py", "--selftest"], id="game-rules"),
     pytest.param(["src/check_integration.py"], id="integration"),

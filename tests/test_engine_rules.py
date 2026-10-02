@@ -247,3 +247,42 @@ def test_main_loop_runs_until_quit(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert not game.running
     assert len(frames) == 1
     assert 0.0 <= frames[0] <= 0.05, "a stalled frame must be clamped"
+
+
+# --- regressions ---------------------------------------------------------------------------
+def test_the_last_pellet_wins_the_round_even_with_a_ghost_on_the_player(playing_game: Game) -> None:
+    """A touch in the frame the board empties must not take a life from a cleared round."""
+    game = playing_game
+    last = next(iter(game.maze.pellets))
+    game.maze.pellets, game.maze.power_pellets = {last}, set()
+    game.player.x, game.player.y = game.maze.tile_center(*last)
+    game.player.direction = None
+    chaser = game.ghosts[0]
+    chaser.state = CHASE
+    chaser.x, chaser.y = game.player.x, game.player.y
+    game.lives = 1
+
+    game.update(STEP)
+
+    assert game.state == ROUND_CLEAR
+    assert game.lives == 1, "the last life was taken from a round already won"
+
+
+def test_equalling_the_high_score_is_not_a_new_high_score() -> None:
+    from game.profile import Profile, ProfileStore
+
+    game = Game(headless=True, profile=ProfileStore(None))
+    game.profile = Profile(high_score=500)
+    game.score, game.lives = 500, 0
+    game._after_death()
+    assert game.state == GAME_OVER
+    assert not game.new_high_score
+    assert "NEW HIGH SCORE!" not in game.banner_lines()[1]  # type: ignore[index]
+
+    game.new_game()
+    game.score, game.lives = 510, 0
+    game._after_death()
+    assert game.new_high_score
+    assert "NEW HIGH SCORE!" in game.banner_lines()[1]
+    game.new_game()
+    assert not game.new_high_score, "a new game starts without the flag"

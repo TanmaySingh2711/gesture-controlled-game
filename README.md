@@ -195,14 +195,14 @@ gesture-controlled-game/
 ├── tests/                    # pytest suite
 ├── requirements/             # cuda.txt, cpu.txt, dev.txt
 ├── model/                    # the trained model and its training history
-├── dataset/                  # image folders (images not in git), split and class mapping
-├── dataset_external/         # list of the extra test images (images not in git)
+├── dataset/                  # image folders (images not in git), split and class mapping,
+│                             # and external/ - the unseen-people test set
 ├── reports/                  # evaluation results and figures
 └── docs/                     # architecture, model card, dataset card and more
 ```
 
-Tool caches and coverage files go into a `.cache/` folder. It is ignored by git and safe to
-delete.
+Everything the tools generate - caches, coverage files, QA image sheets - goes into one `.cache/`
+folder. It is ignored by git and safe to delete.
 
 ## Requirements
 

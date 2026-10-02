@@ -13,7 +13,7 @@ touching anything that is frozen:
 Rules
 -----
 * **Train and validation only.** The test split is never iterated; P5 used it exactly once.
-* **The frozen checkpoint is never written.** Study weights go to `model/studies/` (gitignored).
+* **The frozen checkpoint is never written.** Study weights go to `.cache/model_studies/` (gitignored).
 * **Three seeds per configuration.** On a 200-image validation set a single image is 0.5%, so a
   single run cannot separate configurations; the report gives mean and spread.
 * **Resumable.** Results are written after every run, and a rerun skips finished ones.
@@ -60,8 +60,8 @@ from src.train_model import (
 )
 
 REPORT_PATH: Final = Path(PROJECT_ROOT) / "reports" / "model_study.json"
-QUICK_REPORT_PATH: Final = Path(PROJECT_ROOT) / "reports" / "model_study_quick.json"
-STUDY_DIR: Final = Path(PROJECT_ROOT) / "model" / "studies"
+QUICK_REPORT_PATH: Final = Path(PROJECT_ROOT) / ".cache" / "model_study_quick.json"
+STUDY_DIR: Final = Path(PROJECT_ROOT) / ".cache" / "model_studies"
 
 SEEDS: Final = (42, 7, 1234)
 HP_LEARNING_RATES: Final = (3e-5, 1e-4, 3e-4)

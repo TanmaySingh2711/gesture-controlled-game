@@ -1,6 +1,8 @@
+# hatchling, because its editable install leaves nothing behind in the project folder
+# (setuptools writes a `<name>.egg-info/` directory into it on every install).
 [build-system]
-requires = ["setuptools>=77"]  # 77 is the first release that reads the SPDX `license` field
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]  # 1.27 is the first release that reads the SPDX `license` field
+build-backend = "hatchling.build"
 
 [project]
 name = "gesture-pacman"
@@ -24,7 +26,7 @@ dependencies = []
 gesture-pacman = "src.play_gesture:main"
 pacman-keyboard = "game.main:main"
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["game", "src"]
 
 # ---------------------------------------------------------------------------------------
@@ -67,17 +69,17 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests import optional heavy dependencies only after pytest.importorskip() has confirmed them.
-"tests/**" = ["S101", "S603", "E402", "PLR0915", "PLR0913", "PLR0917", "PLC0415", "SLF001"]
+"tests/**" = ["S101", "S603", "E402", "PLR0915", "PLR0913", "PLC0415"]
 # The check scripts import heavy or display-dependent modules only after setting up the
 # environment they are proving something about, and are long linear lists of checks.
-"src/check_*.py" = ["PLR0915", "PLR0912", "PLR0914", "PLC0415"]
+"src/check_*.py" = ["PLR0915", "PLR0912", "PLC0415"]
 # A diagnostic must report every failure it meets rather than crash on the first one.
 "src/environment_check.py" = ["BLE001", "PLC0415"]
 # Downloads use module-level https constants, validated before any request is made.
 "src/crop_hagrid_hands.py" = ["S310"]
 # The self-test deliberately imports pygame only after forcing the dummy video driver, and
 # is one long, linear script of checks rather than a branching program.
-"game/main.py" = ["PLR0915", "PLR0914", "PLR0912", "PLC0415"]
+"game/main.py" = ["PLR0915", "PLR0912", "PLC0415"]
 # The worker imports OpenCV and the recognizer lazily, inside the thread, so that a keyboard-only
 # process - and the whole `game` package - never loads torch or cv2.
 "src/game_integration.py" = ["PLC0415"]

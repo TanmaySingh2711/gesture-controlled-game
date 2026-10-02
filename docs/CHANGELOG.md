@@ -45,7 +45,26 @@ each verified before the next began; the entries below follow those phases.
   `fix:` or `docs:` (so "Update" is refused); `pre-commit install` sets up all three hook stages.
   `pre-commit` is pinned in `requirements/dev.txt`. The README shows the CI status badge.
 
+### Fixed in the game
+- **The last pellet and a ghost in the same frame:** the round cleared *and* a life was taken;
+  on the last life the player then carried on with none. The last pellet now wins the round at
+  once, before the ghosts move.
+- **"NEW HIGH SCORE!" on a tie:** equalling the old best was announced as a new high score.
+- **Respawned ghosts ignored the global mode:** a ghost that was eaten and came back out always
+  left the house in chase mode, even while the others were scattering.
+- **`Ghost(...)` started too fast:** an unused `speed_scale=1.0` parameter made a ghost built
+  without `set_round()` run at 6.0 tiles per second instead of 5.4. The parameter is removed.
+
 ### Reorganised
+- **One generated folder:** QA image sheets, study weights, the quick study report and the crop
+  staging folder moved from `reports/qa/`, `model/studies/`, `reports/` and `dataset_cropped/` into
+  `.cache/`. The build backend is now hatchling, whose editable install leaves no `egg-info`
+  folder in the project root. `.gitignore` shrank from 32 patterns to 7.
+- **`dataset_external/` is now `dataset/external/`**, byte-identical, so all image data lives
+  under one folder. The duplicate guard, the dataset check and the crop tool know it is not a
+  gesture class.
+- Two pairs of test files that covered one module each were merged (collect_dataset,
+  realtime_gesture); the same 56 tests run.
 - **Project root holds only the essentials:** `README.md`, `install.py`, `pyproject.toml` and the
   folders. Every other document moved to `docs/` (changelog, contributing, security, project
   spec, final test report), the requirements files to `requirements/` (`cuda.txt`, `cpu.txt`,

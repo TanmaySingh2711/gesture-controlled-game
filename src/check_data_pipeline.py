@@ -51,7 +51,7 @@ from src.paths import shown
 TRAIN_PER_CLASS, VAL_PER_CLASS, TEST_PER_CLASS = 400, 50, 50
 EXPECTED = {"train": 1600, "val": 200, "test": 200}
 REQUIRED_MAPPING = {"left": 0, "right": 1, "up": 2, "down": 3}
-QA_DIR = os.path.join(PROJECT_ROOT, "reports", "qa")  # generated sheets, gitignored
+QA_DIR = os.path.join(PROJECT_ROOT, ".cache", "qa")  # generated sheets, gitignored
 GRID_PATH = os.path.join(QA_DIR, "augmentation_sample_grid.jpg")
 UPDOWN_GRID_PATH = os.path.join(QA_DIR, "augmentation_updown_grid.jpg")
 

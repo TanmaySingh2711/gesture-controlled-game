@@ -1,4 +1,4 @@
-"""Keyboard-controlled 2D obstacle dodger (Objective 8).
+"""The Pac-Man game: pure Pygame, playable on the keyboard, with no CNN code.
 
-Gesture control is added in Objective 9 by driving `game.game.Controls`.
+Gestures drive it from outside through the same `request_direction` seam the keyboard uses.
 """

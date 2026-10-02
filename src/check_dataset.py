@@ -23,7 +23,7 @@ Usage:
     python src/check_dataset.py
     python src/check_dataset.py --grid                   # also write a sample contact sheet
     python src/check_dataset.py --updown-grid            # thumbs-up vs thumbs-down QA sheet
-    python src/check_dataset.py --dir dataset_cropped    # check a candidate dataset first
+    python src/check_dataset.py --dir .cache/dataset_cropped   # check a candidate first
 """
 
 import argparse
@@ -56,7 +56,10 @@ MAX_ASPECT = 1.15  # hand crops are squared off, so w/h must stay close to 1
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
-QA_DIR = os.path.join(PROJECT_ROOT, "reports", "qa")  # generated sheets, gitignored
+QA_DIR = os.path.join(PROJECT_ROOT, ".cache", "qa")  # generated sheets, gitignored
+
+# Folders that may sit beside the four classes: the unseen-people evaluation set.
+NOT_CLASSES = ("external",)
 GRID_PATH = os.path.join(QA_DIR, "dataset_sample_grid.jpg")
 
 GRID_SAMPLES = 10
@@ -285,7 +288,7 @@ def main() -> int:
         if os.path.isdir(DATASET_DIR)
         else []
     )
-    stray = [name for name in present if name not in CLASSES]
+    stray = [name for name in present if name not in CLASSES and name not in NOT_CLASSES]
     record(
         "No stray classes",
         not stray,

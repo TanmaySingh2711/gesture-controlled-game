@@ -118,20 +118,21 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for name in ("left", "right", "up", "down"):
         (tmp_path / "dataset" / name).mkdir(parents=True)
     monkeypatch.setattr(chh, "DATASET_DIR", str(tmp_path / "dataset"))
-    monkeypatch.setattr(chh, "CROPPED_DIR", str(tmp_path / "dataset_cropped"))
+    monkeypatch.setattr(chh, "CROPPED_DIR", str(tmp_path / ".cache" / "dataset_cropped"))
     monkeypatch.setattr(chh, "CACHE_DIR", str(tmp_path / ".cache" / "hagrid"))
     monkeypatch.setattr(audit, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(audit, "DATASET_DIR", tmp_path / "dataset")
     monkeypatch.setattr(audit, "SPLITS_FILE", tmp_path / "data_splits.json")
     monkeypatch.setattr(audit, "REPORTS_DIR", tmp_path / "reports")
-    monkeypatch.setattr(audit, "EXTERNAL_DIR", tmp_path / "dataset_external")
+    monkeypatch.setattr(audit, "EXTERNAL_DIR", tmp_path / "dataset" / "external")
     monkeypatch.setattr(audit, "DIGEST_CACHE", tmp_path / ".cache" / "hagrid" / "digests.json")
     return tmp_path
 
 
 def project_snapshot() -> tuple[bool, int]:
-    """Whether dataset_cropped/ exists in the real project, and how many real dataset images."""
-    return (PROJECT / "dataset_cropped").exists(), len(list((PROJECT / "dataset").rglob("*.jpg")))
+    """Whether the staging folder exists in the real project, and how many real images."""
+    staging = PROJECT / ".cache" / "dataset_cropped"
+    return staging.exists(), len(list((PROJECT / "dataset").rglob("*.jpg")))
 
 
 def test_build_then_audit_recovers_every_crop_and_its_person(
@@ -149,7 +150,7 @@ def test_build_then_audit_recovers_every_crop_and_its_person(
     assert "RESULT: PASS" in output
     built = sorted(p.relative_to(workspace).as_posix() for p in workspace.rglob("dataset/*/*.jpg"))
     assert len(built) == 4 * PER_CLASS
-    assert not (workspace / "dataset_cropped").exists(), "promotion removes the staging folder"
+    assert not (workspace / ".cache" / "dataset_cropped").exists(), "promotion removes staging"
     assert (workspace / ".cache" / "hagrid" / "ann_fist.json").exists(), "--keep-cache kept it"
 
     # --- audit ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ def test_build_then_audit_recovers_every_crop_and_its_person(
     assert leakage["shared_between_splits"]["train/test"]["shared_people"] == 0
     assert leakage["lineage_matched"] == f"{4 * PER_CLASS}/{4 * PER_CLASS}"
 
-    manifest = json.loads((workspace / "dataset_external" / "manifest.json").read_text("utf-8"))
+    manifest = json.loads((workspace / "dataset" / "external" / "manifest.json").read_text("utf-8"))
     assert manifest["lineage_complete"] is True
     assert len(manifest["files"]) == 4
     dataset_people = {origin["user_id"] for origin in lineage["files"].values()}

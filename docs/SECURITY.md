@@ -49,6 +49,6 @@ packaging. Track PyTorch's security advisories for those two directly.
 
 ## Reporting a problem
 
-This is a student project with no production deployment. If you find a security issue, open an
+This project has no production deployment. If you find a security issue, open an
 issue in the repository describing it, or contact the repository owner directly for anything
 you would rather not post publicly.

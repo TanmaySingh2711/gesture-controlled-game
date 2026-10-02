@@ -57,8 +57,8 @@ def test_entries_come_from_the_manifest_in_a_fixed_order(tmp_path: Path) -> None
     manifest = tmp_path / "manifest.json"
     manifest.write_text(json.dumps({"files": {"up/b.jpg": {}, "left/a.jpg": {}}}), "utf-8")
     assert rob.load_entries(manifest) == [
-        {"path": "dataset_external/left/a.jpg", "label": 0},
-        {"path": "dataset_external/up/b.jpg", "label": 2},
+        {"path": "dataset/external/left/a.jpg", "label": 0},
+        {"path": "dataset/external/up/b.jpg", "label": 2},
     ]
     manifest.write_text(json.dumps({"files": {"jump/a.jpg": {}}}), "utf-8")
     with pytest.raises(ValueError, match="unknown class 'jump'"):
@@ -67,17 +67,19 @@ def test_entries_come_from_the_manifest_in_a_fixed_order(tmp_path: Path) -> None
 
 @pytest.fixture
 def external(tiny_dataset: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> Path:
-    """The tiny validation images laid out as dataset_external/ with a manifest."""
+    """The tiny validation images laid out as dataset/external/ with a manifest."""
     root: Path = tiny_dataset["root"]
     files: dict[str, dict[str, Any]] = {}
     for number, entry in enumerate(tiny_dataset["splits"]["val"]):
         relative = f"{entry['class']}/{entry['class']}_{number:05d}.jpg"
-        (root / "dataset_external" / entry["class"]).mkdir(parents=True, exist_ok=True)
-        shutil.copy(root / entry["path"], root / "dataset_external" / relative)
+        (root / "dataset" / "external" / entry["class"]).mkdir(parents=True, exist_ok=True)
+        shutil.copy(root / entry["path"], root / "dataset" / "external" / relative)
         files[relative] = {}
-    (root / "dataset_external" / "manifest.json").write_text(json.dumps({"files": files}), "utf-8")
+    (root / "dataset" / "external" / "manifest.json").write_text(
+        json.dumps({"files": files}), "utf-8"
+    )
     monkeypatch.setattr(rob, "PROJECT_ROOT", root)
-    monkeypatch.setattr(rob, "MANIFEST_PATH", root / "dataset_external" / "manifest.json")
+    monkeypatch.setattr(rob, "MANIFEST_PATH", root / "dataset" / "external" / "manifest.json")
     monkeypatch.setattr(rob, "REPORT_PATH", root / "reports" / "robustness.json")
     return root
 
@@ -101,9 +103,9 @@ def test_a_full_run_scores_every_condition_on_the_cpu(
 def test_missing_images_or_manifest_stop_the_run(
     external: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    next((external / "dataset_external").rglob("*.jpg")).unlink()
+    next((external / "dataset" / "external").rglob("*.jpg")).unlink()
     assert rob.main(["--device", "cpu"]) == 1
     assert "image(s) missing" in capsys.readouterr().out
-    (external / "dataset_external" / "manifest.json").unlink()
+    (external / "dataset" / "external" / "manifest.json").unlink()
     assert rob.main(["--device", "cpu"]) == 1
     assert "manifest.json not found" in capsys.readouterr().out

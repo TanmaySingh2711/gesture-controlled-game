@@ -81,7 +81,7 @@ def tile_distance(a: Tile, b: Tile) -> int:
 
 
 class Ghost(Entity):
-    def __init__(self, maze: Maze, role: str, speed_scale: float = 1.0, seed: int = 0) -> None:
+    def __init__(self, maze: Maze, role: str, seed: int = 0) -> None:
         self.role = role
         self.scatter_target: Tile = SCATTER_TARGETS[role]
         # A stable per-role offset. The first version used `hash(role)`, which Python
@@ -92,13 +92,13 @@ class Ghost(Entity):
         self.state: str = HOUSE
         self.release_timer: float = RELEASE_DELAY[role]
         self.released = False
-        self.base_speed: float = min(GHOST_MAX_SPEED, GHOST_BASE_SPEED + speed_scale)
+        self.base_speed: float = GHOST_BASE_SPEED  # round 1; set_round() raises it later
         self.elroy_bonus = 0.0
         self.frightened_flash = False
         self._bob_direction = "up"
         self._player: Entity | None = None
         self._chaser: Ghost | None = None
-        self._pending_mode: str | None = None
+        self._global_mode: str = CHASE  # the game's scatter/chase mode, kept up to date
         self.reset()
 
     # --- lifecycle -----------------------------------------------------------------------
@@ -258,8 +258,10 @@ class Ghost(Entity):
     def _arrival_checks(self) -> None:
         """State transitions that depend on where the ghost has got to."""
         if self.state == HOUSE and self.released and self.tile == HOUSE_EXIT:
-            self.state = self._pending_mode or CHASE
-            self._pending_mode = None
+            # Every exit adopts the current global mode - the first one, and each return after
+            # being eaten. Forgetting it after the first exit sent a respawned ghost out in
+            # CHASE while the other three were scattering.
+            self.state = self._global_mode
         elif self.state == EATEN and self.tile == GHOST_SPAWN[self.role]:
             self.state = HOUSE
             self.released = False
@@ -267,8 +269,8 @@ class Ghost(Entity):
             self.direction = "up"
 
     def rejoin_mode(self, mode: str) -> None:
-        """Told by the game which global mode to adopt once it reaches the house exit."""
-        self._pending_mode = mode
+        """Told by the game which global mode to adopt whenever it reaches the house exit."""
+        self._global_mode = mode
 
     def on_center(self) -> None:
         """Pick the exit that gets closest to the target. This is the whole navigation rule."""

@@ -1,6 +1,6 @@
 """How the frozen model holds up under the camera conditions a real player's room can produce.
 
-The unseen-subject set (`dataset_external/`, 2,000 HaGRID crops from 1,727 people the model never
+The unseen-subject set (`dataset/external/`, 2,000 HaGRID crops from 1,727 people the model never
 saw) is re-scored under simulated webcam problems - dim or harsh light, blur, sensor noise, heavy
 JPEG compression, low resolution, a colour cast, a tilted hand - each at fixed strengths.
 
@@ -38,7 +38,7 @@ from src.evaluate_model import BATCH_SIZE, load_model
 from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
-MANIFEST_PATH: Final = PROJECT_ROOT / "dataset_external" / "manifest.json"
+MANIFEST_PATH: Final = PROJECT_ROOT / "dataset" / "external" / "manifest.json"
 REPORT_PATH: Final = PROJECT_ROOT / "reports" / "robustness.json"
 LIVE_THRESHOLD: Final = 0.90
 
@@ -158,7 +158,7 @@ def load_entries(manifest_path: Path) -> list[dict[str, Any]]:
         label = relative.split("/", 1)[0]
         if label not in CLASS_TO_INDEX:
             raise ValueError(f"{relative}: unknown class {label!r}")
-        entries.append({"path": f"dataset_external/{relative}", "label": CLASS_TO_INDEX[label]})
+        entries.append({"path": f"dataset/external/{relative}", "label": CLASS_TO_INDEX[label]})
     return entries
 
 
@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not MANIFEST_PATH.exists():
         print(
-            "ERROR: dataset_external/manifest.json not found - build it with "
+            "ERROR: dataset/external/manifest.json not found - build it with "
             "`python -m src.audit_hagrid_lineage --external 500`"
         )
         return 1
@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     clean = rows[0]["accuracy"]
     worst = min(rows, key=lambda row: row["accuracy"])
     report = {
-        "source": "dataset_external/ - 2,000 unseen-subject HaGRID crops, frozen model",
+        "source": "dataset/external/ - 2,000 unseen-subject HaGRID crops, frozen model",
         "rules": [
             "measurement only: nothing trained, no setting tuned from these numbers",
             "the P3 test split is never touched",

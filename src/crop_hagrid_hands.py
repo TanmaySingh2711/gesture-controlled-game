@@ -39,7 +39,7 @@ Crop geometry:
 No resizing, normalization, augmentation or splitting happens here - P3 owns those.
 
 Usage:
-    python src/crop_hagrid_hands.py                        # all four classes -> dataset_cropped/
+    python src/crop_hagrid_hands.py                        # all four -> .cache/dataset_cropped/
     python src/crop_hagrid_hands.py --classes up down      # only the named classes
     python src/crop_hagrid_hands.py --promote              # ...then move them into dataset/
     python src/crop_hagrid_hands.py --per-class 500
@@ -81,7 +81,7 @@ MIN_BOX_FRACTION = 0.10  # skip boxes smaller than this fraction of the image's 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
-CROPPED_DIR = os.path.join(PROJECT_ROOT, "dataset_cropped")
+CROPPED_DIR = os.path.join(PROJECT_ROOT, ".cache", "dataset_cropped")  # staging, until promoted
 CACHE_DIR = os.path.join(PROJECT_ROOT, ".cache", "hagrid")  # annotations, re-downloadable
 
 
@@ -205,7 +205,8 @@ def existing_hashes(selected: list[str]) -> set[str]:
         return digests
     for label in sorted(os.listdir(DATASET_DIR)):
         folder = os.path.join(DATASET_DIR, label)
-        if label in selected or not os.path.isdir(folder):
+        # Only the class folders: dataset/ also holds external/, which is not a class.
+        if label in selected or label not in CLASSES or not os.path.isdir(folder):
             continue
         for name in os.listdir(folder):
             if name.startswith("."):
@@ -439,7 +440,7 @@ def drop_annotation_cache(selected: list[str]) -> None:
 
 
 def promote(selected: list[str]) -> None:
-    print("\npromoting dataset_cropped/ to dataset/ ...")
+    print("\npromoting .cache/dataset_cropped/ to dataset/ ...")
     for label in selected:
         destination = os.path.join(DATASET_DIR, label)
         os.makedirs(destination, exist_ok=True)
@@ -451,7 +452,7 @@ def promote(selected: list[str]) -> None:
         os.rmdir(os.path.join(CROPPED_DIR, label))
     if os.path.isdir(CROPPED_DIR) and not os.listdir(CROPPED_DIR):
         os.rmdir(CROPPED_DIR)
-    print("dataset/ now holds the hand-region crops; dataset_cropped/ removed")
+    print("dataset/ now holds the hand-region crops; the staging folder is removed")
 
 
 def main(argv: list[str] | None = None) -> int:
