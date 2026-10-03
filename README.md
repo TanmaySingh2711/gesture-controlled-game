@@ -190,7 +190,7 @@ gesture-controlled-game/
 │   ├── train_model.py  data_pipeline.py  model_study.py
 │   ├── evaluate_model.py  evaluate_external.py  evaluate_robustness.py
 │   ├── crop_hagrid_hands.py  audit_hagrid_lineage.py  collect_dataset.py
-│   ├── environment_check.py  live_report.py  measure_memory.py
+│   ├── environment_check.py  live_report.py  measure_memory.py  paths.py
 │   └── check_*.py            # standalone self-test scripts
 ├── tests/                    # pytest suite
 ├── requirements/             # cuda.txt, cpu.txt, dev.txt
@@ -475,7 +475,7 @@ Most of that change time is the hand moving. Once the model first sees the new g
 | Strong blur | 76.7% |
 | Heavy camera noise, as in a dark room | 58.6% |
 
-**Tests:** about 510 automated tests. Coverage is 94% when run without a GPU or the dataset, and
+**Tests:** about 530 automated tests. Coverage is 94% when run without a GPU or the dataset, and
 CI fails if it drops below 90%.
 
 ## Limitations
