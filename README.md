@@ -13,14 +13,14 @@ A Pac-Man-style maze game that you steer with hand gestures in front of a webcam
 
 ## Screenshots
 
+The start screen explains the gestures and keys while the model loads in the background.
+
+![Start screen listing the four gestures and the keyboard controls](docs/images/start_screen.png)
+
 Playing with gestures. The panel on the right shows what the CNN sees, the command that is
 steering Pac-Man (an open palm, so RIGHT, at 99.9% confidence) and the four gesture mappings.
 
 ![Gameplay: the maze on the left, the live camera view and gesture panel on the right](docs/images/gameplay.png)
-
-The start screen explains the gestures and keys while the model loads in the background.
-
-![Start screen listing the four gestures and the keyboard controls](docs/images/start_screen.png)
 
 ## Quick Start
 
