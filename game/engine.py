@@ -153,6 +153,9 @@ class Game:
         *,
         profile: ProfileStore | None = None,
     ) -> None:
+        if not headless:
+            # Open the window in the middle of the screen rather than wherever the OS likes.
+            os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
         pygame.init()
         self.headless = headless
         # Only a real window on a real display plays sound or writes the profile. Headless

@@ -5,6 +5,17 @@ each verified before the next began; the entries below follow those phases.
 
 ## [Unreleased] - reach, honesty and evidence round
 
+### Changed
+- **Bigger camera view.** The preview of what the CNN sees grew from 200 x 200 to 376 x 376 px
+  (3.5 times the area), so hand position is easy to judge mid-game. The panel is 432 px wide
+  (window 992 x 704): the current gesture and the gesture key sit side by side under the
+  preview, and when the camera has no picture or fails, the box itself says what to do.
+- **Windows open in the middle of the screen.** The game window is centred, and so is the
+  command window `run_game.bat` opens on a double-click (`src/console_window.py`; under
+  Windows Terminal it reopens once in the classic console window, which can be moved).
+- **ESC closes everything at once:** the game window closes before the camera is released, and
+  the command window closes with it.
+
 ### Added
 - **CPU fallback.** The recognizer runs on the CPU when there is no CUDA GPU (about 12 ms per
   frame; the same predicted class as the GPU on all 200 validation images). `--device

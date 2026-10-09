@@ -41,12 +41,19 @@ if TYPE_CHECKING:
 TITLE: Final = "CNN GESTURE CONTROLLED PAC-MAN"
 FONT: Final = "consolas,dejavusansmono,monospace"
 
-PANEL_WIDTH: Final = 264
-PREVIEW_SIZE: Final = 200
+# The panel is sized around the camera preview: what the CNN sees is the thing a gesture
+# player looks at most, so it gets a 376 px square - large enough to judge hand position at a
+# glance. 432 + 560 px of maze keeps the window within a 1536 x 864 (125 %-scaled 1080p) laptop
+# screen.
+PANEL_WIDTH: Final = 432
+PREVIEW_SIZE: Final = 376
 PANEL_MARGIN: Final = 18
 PANEL_LEFT: Final = WINDOW_WIDTH + PANEL_MARGIN
 PANEL_RIGHT: Final = WINDOW_WIDTH + PANEL_WIDTH - PANEL_MARGIN
 PANEL_CENTRE: Final = WINDOW_WIDTH + PANEL_WIDTH // 2
+# Below the preview, two columns: the command in force on the left, the gesture key on the right.
+COLUMN_WIDTH: Final = 196
+RIGHT_COLUMN: Final = PANEL_LEFT + COLUMN_WIDTH + 12
 
 FRAME_HISTORY: Final = FPS * 60 * 30  # thirty minutes of frame times, then the oldest go
 RECENT_FRAMES: Final = 90  # the on-screen FPS figure averages this many frames
@@ -61,9 +68,8 @@ GESTURE_ROWS: Final = (
 )
 
 KEYBOARD_ROWS: Final = (
-    "Arrows/WASD move   R restart",
-    "P pause   H help   ESC quit",
-    "C theme   M sound",
+    "Arrows/WASD move   P pause   H help   R restart",
+    "C colour theme   M sound   ESC quit",
 )
 
 GESTURE_HELP: Final = (
@@ -89,8 +95,9 @@ _COMMAND_OVERRIDES: Final = {
     "stopped": "GESTURE OFF",
 }
 
-# Shown under the health line when the webcam is open but sends black or static frames.
+# Shown inside the preview box when there is no picture to show, saying what to do about it.
 NO_PICTURE_HINTS: Final = ("Camera is on but sends no image.", "Check its switch or cover.")
+CAMERA_ERROR_HINTS: Final = ("Gesture control unavailable.", "Use Arrow Keys / WASD.")
 
 
 def command_text(snapshot: Snapshot, fresh: bool, use_camera: bool) -> str:
@@ -252,15 +259,18 @@ class GesturePacman:
         cache: dict[str, pygame.Surface] = {}
         cache["panel_title_a"] = self.heading.render("CNN GESTURE CONTROLLED", True, theme.heading)
         cache["panel_title_b"] = self.title_font.render("PAC-MAN", True, theme.accent)
-        cache["camera_label"] = self.heading.render("CAMERA / HAND AREA", True, theme.heading)
-        cache["camera_hint"] = self.small.render("Keep your hand in this box", True, theme.dim_text)
+        cache["camera_hint"] = self.small.render(
+            "What the CNN sees - keep your hand inside this box", True, theme.dim_text
+        )
         cache["current_label"] = self.heading.render("CURRENT GESTURE", True, theme.heading)
         cache["controls_label"] = self.heading.render("GESTURE CONTROLS", True, theme.heading)
-        cache["keyboard_label"] = self.heading.render("KEYBOARD", True, theme.heading)
         cache["no_image"] = self.small.render("no camera image", True, theme.dim_text)
-        cache["no_picture"] = self.small.render("camera sends no picture", True, theme.error)
+        cache["no_picture"] = self.heading.render("NO CAMERA PICTURE", True, theme.error)
+        cache["camera_error"] = self.heading.render("CAMERA ERROR", True, theme.error)
+        for line in (*NO_PICTURE_HINTS, *CAMERA_ERROR_HINTS):
+            cache[f"hint:{line}"] = self.font.render(line, True, theme.dim_text)
         for gesture, direction in GESTURE_ROWS:
-            label = f"{gesture:<12}{direction}"
+            label = f"{gesture:<13}{direction}"
             cache[f"row:{direction}"] = self.font.render(label, True, theme.text)
             cache[f"row!{direction}"] = self.font.render(
                 label, True, theme.directions[direction.lower()]
@@ -416,8 +426,7 @@ class GesturePacman:
 
         y = self._panel_identity(14)
         y = self._panel_camera(y, snapshot)
-        y, command = self._panel_command(y, snapshot, fresh)
-        y = self._panel_mapping(y, command)
+        y = self._panel_status(y, snapshot, fresh)
         self._panel_health(y, snapshot, fresh)
         self._panel_keyboard(snapshot)
 
@@ -425,28 +434,34 @@ class GesturePacman:
         pygame.draw.line(self.game.screen, self.theme.panel_edge, (PANEL_LEFT, y), (PANEL_RIGHT, y))
 
     def _panel_identity(self, y: int) -> int:
+        """One line: the name large on the left, what it is on the right."""
         cache, screen = self._ensure_static(), self.game.screen
-        screen.blit(cache["panel_title_a"], (PANEL_LEFT, y))
-        y += 19
-        screen.blit(cache["panel_title_b"], (PANEL_LEFT, y))
-        y += cache["panel_title_b"].get_height() + 10
+        name, subtitle = cache["panel_title_b"], cache["panel_title_a"]
+        screen.blit(name, (PANEL_LEFT, y))
+        middle = y + name.get_height() // 2
+        screen.blit(subtitle, subtitle.get_rect(midright=(PANEL_RIGHT, middle)))
+        y += name.get_height() + 8
         self._panel_rule(y)
         return y + 10
 
     def _panel_camera(self, y: int, snapshot: Snapshot) -> int:
-        """What the CNN sees: the 300x300 ROI, scaled into the panel."""
+        """What the CNN sees: the 300x300 ROI, scaled up into the panel."""
         cache, screen, theme = self._ensure_static(), self.game.screen, self.theme
-        screen.blit(cache["camera_label"], (PANEL_LEFT, y))
-        y += 22
         box = pygame.Rect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE)
         box.midtop = (PANEL_CENTRE, y)
         self._update_preview(snapshot)
-        if snapshot.status == "no picture":
-            # The last good frame would be stale and a black or static one is meaningless, so
-            # the box says what is wrong instead.
+        trouble = {"no picture": "no_picture", "camera error": "camera_error"}.get(snapshot.status)
+        if trouble is not None:
+            # The last good frame would be stale, and a black or static one is meaningless, so
+            # the box says what is wrong and what to do about it instead.
             self.preview_surface = None
             pygame.draw.rect(screen, theme.background, box)
-            screen.blit(cache["no_picture"], cache["no_picture"].get_rect(center=box.center))
+            hints = NO_PICTURE_HINTS if trouble == "no_picture" else CAMERA_ERROR_HINTS
+            lines = [cache[trouble], *(cache[f"hint:{line}"] for line in hints)]
+            line_y = box.centery - sum(line.get_height() + 6 for line in lines) // 2
+            for line in lines:
+                screen.blit(line, line.get_rect(midtop=(box.centerx, line_y)))
+                line_y += line.get_height() + 6
         elif self.preview_surface is not None:
             screen.blit(self.preview_surface, box.topleft)
         else:
@@ -459,51 +474,38 @@ class GesturePacman:
         self._panel_rule(y)
         return y + 10
 
-    def _panel_command(self, y: int, snapshot: Snapshot, fresh: bool) -> tuple[int, str]:
-        """The command actually steering the game, with its confidence when it has one."""
+    def _panel_status(self, y: int, snapshot: Snapshot, fresh: bool) -> int:
+        """Two columns: the command steering the game, and the four gestures with it lit up."""
         cache, screen, theme = self._ensure_static(), self.game.screen, self.theme
         screen.blit(cache["current_label"], (PANEL_LEFT, y))
-        y += 22
+        screen.blit(cache["controls_label"], (RIGHT_COLUMN, y))
+        top = y + 22
+
         command = command_text(snapshot, fresh, self.use_camera)
         surface = self.command_font.render(command, True, command_color(command, theme))
-        screen.blit(surface, (PANEL_LEFT, y))
-        y += surface.get_height() + 2
+        screen.blit(surface, (PANEL_LEFT, top))
         confidence = confidence_text(snapshot, fresh, self.use_camera)
         if confidence:
-            screen.blit(self.font.render(confidence, True, theme.dim_text), (PANEL_LEFT, y))
-        y += 22
-        self._panel_rule(y)
-        return y + 10, command
+            line = self.font.render(confidence, True, theme.dim_text)
+            screen.blit(line, (PANEL_LEFT, top + surface.get_height() + 4))
 
-    def _panel_mapping(self, y: int, command: str) -> int:
-        """The four gestures, with the one currently in force highlighted."""
-        cache, screen = self._ensure_static(), self.game.screen
-        screen.blit(cache["controls_label"], (PANEL_LEFT, y))
-        y += 22
+        row_y = top
         for _, direction in GESTURE_ROWS:
             key = f"row!{direction}" if command == direction else f"row:{direction}"
-            screen.blit(cache[key], (PANEL_LEFT, y))
-            y += 20
-        y += 4
+            screen.blit(cache[key], (RIGHT_COLUMN, row_y))
+            row_y += 20
+        y = row_y + 6
         self._panel_rule(y)
         return y + 10
 
     def _panel_health(self, y: int, snapshot: Snapshot, fresh: bool) -> None:
+        """One line on how gesture control is doing; any advice is shown in the preview box."""
         screen, theme = self.game.screen, self.theme
         status = control_status(snapshot, fresh, self.use_camera)
         screen.blit(self.font.render(status, True, status_color(status, theme)), (PANEL_LEFT, y))
-        y += 19
-        hints: tuple[str, ...] = ()
-        if status == "CAMERA ERROR":
-            hints = ("Gesture control unavailable.", "Use Arrow Keys / WASD.")
-        elif status == "CAMERA: NO PICTURE":
-            hints = NO_PICTURE_HINTS
-        for line in hints:
-            screen.blit(self.small.render(line, True, theme.dim_text), (PANEL_LEFT, y))
-            y += 15
 
     def _panel_keyboard(self, snapshot: Snapshot) -> None:
-        """Keyboard fallback and diagnostics, pinned to the bottom of the panel."""
+        """Keyboard keys and diagnostics, pinned to the bottom of the panel."""
         cache, screen = self._ensure_static(), self.game.screen
         bottom = WINDOW_HEIGHT - PANEL_MARGIN
         self._draw_diagnostics(screen, PANEL_LEFT, bottom, snapshot)
@@ -511,8 +513,6 @@ class GesturePacman:
         for line in reversed(KEYBOARD_ROWS):
             bottom -= 16
             screen.blit(cache[f"key:{line}"], (PANEL_LEFT, bottom))
-        bottom -= 21
-        screen.blit(cache["keyboard_label"], (PANEL_LEFT, bottom))
         self._panel_rule(bottom - 10)
 
     def _draw_diagnostics(
@@ -561,6 +561,8 @@ class GesturePacman:
                     self.draw()
                 pygame.display.flip()
         finally:
+            # Close the window first, so ESC feels instant while the camera is let go.
+            pygame.display.quit()
             released = self.stop()
             pygame.quit()
             self._report(released)

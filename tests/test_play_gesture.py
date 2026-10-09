@@ -12,11 +12,17 @@ import pytest
 from game.theme import THEMES, Theme
 from src.game_integration import GestureController, SharedState, Snapshot
 from src.play_gesture import (
+    CAMERA_ERROR_HINTS,
+    COLUMN_WIDTH,
     FRAME_HISTORY,
     GESTURE_HELP,
     NO_PICTURE_HINTS,
+    PANEL_LEFT,
     PANEL_MARGIN,
+    PANEL_RIGHT,
     PANEL_WIDTH,
+    PREVIEW_SIZE,
+    RIGHT_COLUMN,
     GesturePacman,
     build_parser,
     command_color,
@@ -148,16 +154,29 @@ def test_parser_exits_cleanly_on_a_bad_threshold() -> None:
 @pytest.mark.parametrize("theme_name", list(THEMES))
 def test_every_panel_string_fits_inside_the_panel(app: GesturePacman, theme_name: str) -> None:
     app.game.set_theme(THEMES[theme_name])
-    for surface in app._ensure_static().values():
+    static = app._ensure_static()
+    for surface in static.values():
         assert surface.get_width() <= INNER_WIDTH
+    # The gesture key sits in the right-hand column, beside the command.
+    for key, surface in static.items():
+        if key.startswith(("row:", "row!")) or key == "controls_label":
+            assert RIGHT_COLUMN + surface.get_width() <= PANEL_RIGHT, key
+    assert static["current_label"].get_width() <= COLUMN_WIDTH
     for status in STATUSES:
         for fresh in (True, False):
             for command in ("left", "right", "up", "down", None):
                 shown = snap(status, command)
                 headline = command_text(shown, fresh, True)
-                assert app.command_font.size(headline)[0] <= INNER_WIDTH, headline
+                assert app.command_font.size(headline)[0] <= COLUMN_WIDTH, headline
+                confidence = confidence_text(shown, fresh, True) or ""
+                assert app.font.size(confidence)[0] <= COLUMN_WIDTH, confidence
                 health = control_status(shown, fresh, True)
                 assert app.font.size(health)[0] <= INNER_WIDTH, health
+
+
+def test_the_two_columns_do_not_overlap() -> None:
+    assert PANEL_LEFT + COLUMN_WIDTH < RIGHT_COLUMN < PANEL_RIGHT
+    assert PREVIEW_SIZE <= INNER_WIDTH
 
 
 @pytest.mark.parametrize(("device", "shown"), [("cuda:0", " gpu "), ("cpu", " cpu "), ("", "ms ")])
@@ -179,14 +198,15 @@ def test_a_camera_without_a_picture_is_explained_not_shown(app: GesturePacman) -
         "Camera sends no picture - check its switch or cover",
         app.theme.error,
     )
-    for line in NO_PICTURE_HINTS:
-        assert app.small.size(line)[0] <= INNER_WIDTH, line
+    for line in (*NO_PICTURE_HINTS, *CAMERA_ERROR_HINTS):
+        assert app.font.size(line)[0] <= PREVIEW_SIZE - 16, line  # drawn inside the preview box
 
     assert app.controller is not None
-    app.preview_surface = pygame.Surface((10, 10))  # a stale frame from before the blackout
-    app.controller.state.publish(status="no picture", camera_ok=False, preview=None)
-    app.draw()
-    assert app.preview_surface is None, "the stale frame must not stay on screen"
+    for status in ("no picture", "camera error"):
+        app.preview_surface = pygame.Surface((10, 10))  # a stale frame from before the fault
+        app.controller.state.publish(status=status, camera_ok=False, preview=None)
+        app.draw()
+        assert app.preview_surface is None, "the stale frame must not stay on screen"
 
 
 def test_static_text_is_rebuilt_only_when_the_theme_changes(app: GesturePacman) -> None:
@@ -259,3 +279,21 @@ def test_report_includes_capture_to_request_latency(
 def test_main_runs_a_keyboard_only_benchmark(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--no-camera", "--benchmark", "5", "--log-level", "WARNING"]) == 0
     assert "game: 5 frames" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("playing", [False, True])
+def test_escape_quits_with_success_so_run_game_closes_its_window(
+    monkeypatch: pytest.MonkeyPatch, playing: bool
+) -> None:
+    """run_game.bat only keeps its window open (paused) when the game exits with an error."""
+    escape = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode="\x1b")
+    start = GesturePacman.start
+
+    def start_then_press_escape(self: GesturePacman) -> None:
+        start(self)
+        if playing:
+            self.begin_play()
+        pygame.event.post(escape)
+
+    monkeypatch.setattr(GesturePacman, "start", start_then_press_escape)
+    assert main(["--no-camera", "--log-level", "WARNING"]) == 0

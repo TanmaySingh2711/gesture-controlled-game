@@ -191,6 +191,7 @@ gesture-controlled-game/
 │   ├── evaluate_model.py  evaluate_external.py  evaluate_robustness.py
 │   ├── crop_hagrid_hands.py  audit_hagrid_lineage.py  collect_dataset.py
 │   ├── environment_check.py  live_report.py  measure_memory.py  paths.py
+│   ├── console_window.py     # centres the window run_game.bat opens
 │   └── check_*.py            # standalone self-test scripts
 ├── tests/                    # pytest suite
 ├── requirements/             # cuda.txt, cpu.txt, dev.txt
@@ -297,7 +298,8 @@ file.
 
 ## How to Run
 
-**Windows:** double-click `run_game.bat`.
+**Windows:** double-click `run_game.bat`. Its command window and the game window both open in
+the middle of the screen, and **ESC** in the game closes both.
 
 **From a terminal**, after activating the environment
 (`venv\Scripts\activate` on Windows, `source venv/bin/activate` elsewhere):
@@ -315,7 +317,7 @@ A game window opens. There is no web page or server to open.
 1. Start the game. A start screen shows the four gestures.
 2. Wait until the camera is ready, then press **SPACE** or **ENTER**.
 3. Sit about an arm's length from the webcam, in a well-lit room.
-4. Hold your hand inside the box shown in the camera panel on the right.
+4. Hold your hand inside the large camera box on the right. It shows exactly what the CNN sees.
 5. Show a gesture to turn. The panel shows the command that is steering Pac-Man.
 6. Hold the gesture a moment before a junction. Pac-Man turns when the turn becomes possible.
 
