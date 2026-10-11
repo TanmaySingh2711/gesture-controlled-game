@@ -550,7 +550,9 @@ protect the reported results, such as never re-running the evaluation on the tes
 
 ## License
 
-The code is released under the [MIT License](LICENSE).
+Copyright (c) 2026 Tanmay Singh. All rights reserved. This is proprietary software: the code is
+visible for viewing only, and you may not use, copy, modify or redistribute it without written
+permission. See [LICENSE](LICENSE).
 
 The HaGRID images used for training have their own license, CC-BY-SA-4.0. They are not part of
 this repository.

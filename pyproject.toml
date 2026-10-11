@@ -10,7 +10,7 @@ version = "1.0.0"
 description = "A Pac-Man-style maze game controlled by hand gestures recognised in real time by a MobileNetV2 CNN."
 readme = "README.md"
 requires-python = ">=3.12"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 license-files = ["LICENSE"]
 authors = [{ name = "Tanmay Singh" }]
 # Runtime dependencies live in requirements/cuda.txt, because PyTorch must come from the PyTorch
