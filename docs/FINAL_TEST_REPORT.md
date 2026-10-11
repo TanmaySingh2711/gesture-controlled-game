@@ -30,7 +30,8 @@ webcam -> RecognitionWorker -> DirectionRecognizer -> stable_command
 ```
 
 The obsolete endless-runner checkpoint is referenced only by guard tests that assert it is
-refused; obsolete game and dataset code live in `*_archive_endless_runner/` and are not imported.
+refused. The obsolete game, dataset and checkpoint files were later deleted from the repository
+(see [CHANGELOG.md](CHANGELOG.md)); nothing imports them.
 
 ## 2. Automated suites
 
@@ -126,6 +127,24 @@ modules); one worker check started a real worker and has been replaced with a de
   recorded as an observation, not attributed.
 - **Gesture feel cannot be automated.** Live gesture accuracy, gesture-only navigation, no-hand
   and idle-hand behaviour, natural transitions, and pre-turning by hand require a person.
+
+### Live gesture trials, recomputed from the saved records
+
+The person-in-front-of-the-camera trials were recorded at P6 (2026-09-13) in
+`reports/p6_live/*.csv`. The figures below were recomputed from those files, so they are checked
+against the records and not only quoted from earlier text. No new live run was made for this
+check, and the recognition path (model, threshold 0.90, smoothing 3-of-5) is unchanged since.
+
+| Trial | Records | Result |
+|---|---|---|
+| Held gesture, 20 per class | `live_direction_test_baseline.csv` | **80 of 80** stable commands correct; raw prediction also 80 of 80; lowest confidence 0.961 |
+| No hand (20) and idle hand (20) | `live_direction_idle_baseline.csv` | **40 of 40** gave no command; highest raw confidence 0.617, under the 0.90 threshold |
+| Gesture changes, final run | `live_direction_transitions.csv` | 6 changes, 0 wrong commands in between; median 1.26 s to a stable command (0.83 s to 1.62 s); recognizer lag mean 143 ms |
+| Gesture changes, first attempt | `live_direction_transitions_firstattempt.csv` | 12 changes, 2 passed through a wrong command; median 2.90 s |
+
+Most of the change time is the hand moving. These trials used one webcam, one room and one
+person, so they show the recognizer works live; they are not a population accuracy figure (the
+2,000 unseen-people images in `reports/external_evaluation.json` are for that).
 
 ## 7. Known limitation
 
