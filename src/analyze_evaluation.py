@@ -1,7 +1,7 @@
 """Statistical rigour for the frozen P5 test evaluation: confidence intervals and calibration.
 
 Reads the per-image predictions that P5 already saved
-(`reports/p5_evaluation/direction_test_predictions.csv`).
+(`reports/test_evaluation/direction_test_predictions.csv`).
 The model is not run and the test split is not evaluated again, so P5's "test set used exactly
 once" rule still holds - this analyses numbers that were recorded at the time.
 
@@ -44,7 +44,7 @@ from src.paths import shown
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 PREDICTIONS_PATH: Final = (
-    PROJECT_ROOT / "reports" / "p5_evaluation" / "direction_test_predictions.csv"
+    PROJECT_ROOT / "reports" / "test_evaluation" / "direction_test_predictions.csv"
 )
 REPORT_PATH: Final = PROJECT_ROOT / "reports" / "evaluation_rigor.json"
 RELIABILITY_PATH: Final = PROJECT_ROOT / "reports" / "reliability_diagram.png"
@@ -257,7 +257,7 @@ def analyse(predictions: Predictions) -> dict[str, Any]:
     selective = selective_prediction(predictions.confidence, correct)
     live = next(row for row in selective if row["threshold"] == LIVE_THRESHOLD)
     return {
-        "source": "reports/p5_evaluation/direction_test_predictions.csv (saved by P5; not rerun)",
+        "source": "reports/test_evaluation/direction_test_predictions.csv (saved by P5; not rerun)",
         "images": total,
         "accuracy": hits / total,
         "accuracy_wilson_95": [overall_low, overall_high],

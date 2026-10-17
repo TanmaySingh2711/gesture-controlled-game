@@ -146,7 +146,7 @@ augmentation never included noise or blur, which is the likely reason.
 
 The two transition runs used identical settings, four minutes apart; the first used an earlier
 version of the recorder that did not yet time the recognizer separately from the hand. Both are
-kept in `reports/p6_live/`. The threshold and the smoothing window were both chosen from these live
+kept in `reports/live_trials/`. The threshold and the smoothing window were both chosen from these live
 trials, never from the test set.
 
 ## Limitations and risks

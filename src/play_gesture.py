@@ -560,6 +560,7 @@ class GesturePacman:
                     self.step(min(dt, 0.05))
                     self.draw()
                 pygame.display.flip()
+                self.game.finish_startup()  # sound loads once the start screen is visible
         finally:
             # Close the window first, so ESC feels instant while the camera is let go.
             pygame.display.quit()

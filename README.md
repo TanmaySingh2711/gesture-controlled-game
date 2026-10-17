@@ -64,17 +64,12 @@ On Windows you can skip the terminal: double-click `setup.bat` once, then `run_g
 
 ## Overview
 
-This is a maze game in the style of Pac-Man. You eat pellets, dodge four ghosts and clear rounds.
+This is a maze game in the style of Pac-Man: you eat pellets, dodge four ghosts and clear rounds.
+The difference is how you steer. A webcam watches your hand, a small neural network (a CNN)
+decides which of four gestures you are showing, and the game turns that into a direction.
 
-The difference is how you steer. A webcam watches your hand, and a small neural network (a CNN)
-looks at each frame and decides which of four gestures you are showing. The game turns that
-gesture into a direction.
-
-The keyboard works at the same time, so you can always fall back to the arrow keys. You can
-also play with the keyboard only, without a webcam.
-
-The trained model is already in the repository. After setup the game works straight away, with
-no dataset to download and nothing to train.
+The keyboard works at the same time, and you can also play without a webcam. The trained model is
+already in the repository, so the game works right after setup, with nothing to download or train.
 
 ## Problem Statement
 
@@ -152,17 +147,12 @@ flowchart LR
     seam --> game["Game loop, 60 FPS"]
 ```
 
-There are two loops, and they never wait for each other:
+Two loops run side by side and never wait for each other. The **recognition thread** owns the
+webcam and the model, and the **main thread** runs the game. They only share the latest result,
+so a slow camera frame can never slow the game down.
 
-- **The recognition thread** owns the webcam and the model. It reads a frame, runs the model
-  and publishes the result.
-- **The main thread** runs the game: input, movement, ghosts and drawing.
-
-They only share the latest result. Older results are dropped, not queued, so a slow camera frame
-cannot slow the game.
-
-Gestures and the keyboard both go through the same direction request, so neither one moves
-Pac-Man directly. The game code in `game/` does not import PyTorch or OpenCV at all.
+Gestures and the keyboard both go through the same direction request, and the game code in
+`game/` does not import PyTorch or OpenCV at all.
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -210,7 +200,7 @@ gesture-controlled-game/
 ├── model/                    # the trained model and its training history
 ├── dataset/                  # split and class mapping (the images are not in git)
 ├── reports/                  # evaluation results and figures
-├── docs/                     # architecture, model card, dataset card, screenshots
+├── docs/                     # deeper documentation: start with docs/README.md
 └── .github/workflows/ci.yml  # CI pipeline
 ```
 
@@ -352,19 +342,15 @@ themselves when the picture returns, and the keyboard keeps working the whole ti
 | R | Restart after Game Over |
 | ESC | Quit |
 
-**Scoring:**
-
-| Item | Points |
-|---|---|
-| Pellet | 10 |
-| Power pellet | 50 |
-| Ghosts eaten in a row | 200, 400, 800, 1600 |
-| Bonus fruit | 100 to 5000 |
+**Scoring:** a pellet is 10 points and a power pellet 50. Ghosts eaten in a row give 200, 400,
+800 and 1600, and bonus fruit is worth 100 to 5000.
 
 ## Example Output
 
-The setup check, `python src/environment_check.py --skip-webcam`, on a laptop with an NVIDIA
-RTX 3050 Ti (shortened):
+<details>
+<summary>The setup check: <code>python src/environment_check.py --skip-webcam</code> (shortened)</summary>
+
+On a laptop with an NVIDIA RTX 3050 Ti:
 
 ```text
 [PASS] Python             3.12.10
@@ -378,8 +364,12 @@ RTX 3050 Ti (shortened):
 RESULT: PASS (all 14 checks passed)
 ```
 
-A speed report, `python src/play_gesture.py --benchmark 600 --device cpu`, on the same laptop
-using only the CPU:
+</details>
+
+<details>
+<summary>A speed report: <code>python src/play_gesture.py --benchmark 600 --device cpu</code></summary>
+
+On the same laptop, using only the CPU:
 
 ```text
 game: 600 frames | 57.5 FPS | frame p95 21.0 ms
@@ -388,6 +378,8 @@ requests applied: 138 | snapshots published: 157 (one slot, never a queue)
 camera frame -> direction request: median 22.4 ms | p95 29.1 ms (70 samples)
 worker stopped cleanly: True
 ```
+
+</details>
 
 ## Model Details
 
@@ -399,21 +391,16 @@ worker stopped cleanly: True
 | Output | A score for each of `left`, `right`, `up` and `down` |
 | File | `model/best_direction_model.pt` |
 
-**Training** ran in two stages on 1,600 images:
+**Training** ran in two stages on 1,600 images. First only the new output layer learned, with the
+rest of the network frozen. Then the last blocks were unfrozen and fine-tuned at a lower learning
+rate. The best version was picked by validation loss.
 
-1. Train only the new output layer, with the rest of the network frozen.
-2. Unfreeze the last blocks and fine-tune them at a lower learning rate.
+Training images were randomly flipped left to right, slightly rotated, shifted and brightened,
+but never flipped upside down, because that would turn a thumbs up into a thumbs down.
 
-The best version was picked by validation loss. Training images were flipped left to right,
-slightly rotated, shifted and brightened at random. They were never flipped upside down,
-because that would turn a thumbs up into a thumbs down.
-
-**While playing**, two rules sit on top of the model:
-
-- A frame only counts if the model is at least 90% confident.
-- A gesture only becomes a command if it wins 3 of the last 5 frames.
-
-Both settings were chosen from live webcam trials, not from the test images.
+**While playing**, a frame only counts if the model is at least 90% confident, and a gesture only
+becomes a command if it wins 3 of the last 5 frames. Both settings came from live webcam trials,
+not from the test images.
 
 More detail: [docs/MODEL_CARD.md](docs/MODEL_CARD.md), and
 [docs/MODEL_STUDY.md](docs/MODEL_STUDY.md), which compares MobileNetV2 with other networks and
@@ -455,7 +442,7 @@ the benchmark shown in [Example Output](#example-output).
 | People the model has never seen (2,000 images) | 99.6% (1,992 of 2,000). 95% range: 99.2% to 99.8% |
 | Macro F1 on the test images | 0.990 |
 
-![Confusion matrix on the test images](reports/p5_evaluation/direction_confusion_matrix.png)
+![Confusion matrix on the test images](reports/test_evaluation/direction_confusion_matrix.png)
 
 ![Training and validation curves](model/direction_training_curves.png)
 
@@ -480,7 +467,8 @@ the benchmark shown in [Example Output](#example-output).
 Most of that change time is the hand moving. Once the model first sees the new gesture, it takes
 143 ms on average to make it a command.
 
-**Camera conditions** (simulated on the 2,000 unseen-people images)
+<details>
+<summary><b>Camera conditions</b> (simulated on the 2,000 unseen-people images)</summary>
 
 | Condition | Accuracy |
 |---|---|
@@ -490,6 +478,8 @@ Most of that change time is the hand moving. Once the model first sees the new g
 | Moderate camera noise | 94.2% |
 | Strong blur | 76.7% |
 | Heavy camera noise, as in a dark room | 58.6% |
+
+</details>
 
 **Tests:** 546 automated tests, run on every push in CI. CI fails if code coverage drops below 90%.
 

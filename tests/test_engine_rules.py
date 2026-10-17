@@ -231,6 +231,16 @@ def test_sound_status_reports_mute_when_a_device_exists(playing_game: Game) -> N
     assert playing_game.sound_status == "off"
 
 
+def test_sound_that_is_still_loading_is_not_reported_unavailable(playing_game: Game) -> None:
+    """Sound loads just after the first frame; the start screen must not say it is missing."""
+    playing_game.audio.pending = True
+    assert playing_game.sound_status == "on"
+    loaded: list[bool] = []
+    playing_game.audio.load = lambda: loaded.append(True)  # type: ignore[method-assign]
+    playing_game.finish_startup()
+    assert loaded == [True]
+
+
 def test_main_loop_runs_until_quit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GESTURE_PACMAN_HOME", str(tmp_path))
     game = Game()  # a real display surface on the dummy video driver

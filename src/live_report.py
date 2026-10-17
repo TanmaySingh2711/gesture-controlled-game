@@ -9,7 +9,7 @@ questions the offline numbers cannot:
 * **Gesture changes** - how often a change passed through a wrong command, and how long it took.
 
 Each rate carries a Wilson 95% interval, so a handful of trials is reported as the uncertain
-evidence it is. `--include-p6` adds the original P6 records from `reports/p6_live/`, labelled as such.
+evidence it is. `--include-p6` adds the original P6 records from `reports/live_trials/`, labelled as such.
 
 Usage:
     python -m src.live_report
@@ -32,12 +32,12 @@ from src.paths import shown
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 SESSIONS_DIR: Final = PROJECT_ROOT / "reports" / "live_sessions"
 REPORT_PATH: Final = PROJECT_ROOT / "reports" / "live_summary.json"
-P6_DIR: Final = PROJECT_ROOT / "reports" / "p6_live"
+LIVE_TRIALS_DIR: Final = PROJECT_ROOT / "reports" / "live_trials"
 P6_FILES: Final = (
-    P6_DIR / "live_direction_test_baseline.csv",
-    P6_DIR / "live_direction_idle_baseline.csv",
-    P6_DIR / "live_direction_transitions_firstattempt.csv",
-    P6_DIR / "live_direction_transitions.csv",
+    LIVE_TRIALS_DIR / "live_direction_test_baseline.csv",
+    LIVE_TRIALS_DIR / "live_direction_idle_baseline.csv",
+    LIVE_TRIALS_DIR / "live_direction_transitions_firstattempt.csv",
+    LIVE_TRIALS_DIR / "live_direction_transitions.csv",
 )
 P6_LABEL: Final = "p6-developer (count not recorded)"
 NO_COMMAND: Final = ("no_hand", "idle_hand")

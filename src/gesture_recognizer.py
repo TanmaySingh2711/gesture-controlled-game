@@ -45,6 +45,8 @@ import cv2
 import torch
 from PIL import Image
 
+# Re-exported: the capture size and open_camera() have always been importable from here.
+from src.camera import FRAME_HEIGHT, FRAME_WIDTH, open_camera  # noqa: F401
 from src.data_pipeline import CLASS_TO_INDEX, IMAGE_SIZE, inference_transform
 from src.train_model import CHECKPOINT_PATH, load_direction_checkpoint
 
@@ -64,9 +66,8 @@ NO_COMMAND_LABEL: Final = "NO COMMAND"
 EXPECTED_TASK: Final = "pacman_direction_v1"
 
 # Fixed capture geometry, frozen in docs/PROJECT_SPEC.md section 7 and unchanged since the dataset
-# was built. The ROI is what the CNN sees; everything outside it is ignored.
-FRAME_WIDTH: Final = 640
-FRAME_HEIGHT: Final = 480
+# was built. The frame size lives in src/camera.py; the ROI is what the CNN sees, and everything
+# outside it is ignored.
 ROI_X1: Final = 300
 ROI_Y1: Final = 90
 ROI_X2: Final = 600
@@ -205,6 +206,19 @@ class DirectionRecognizer:
         tensor: torch.Tensor = self.transform(Image.fromarray(rgb))
         return tensor.unsqueeze(0).to(self.device, non_blocking=True)
 
+    def warm_up(self) -> None:
+        """Run one throwaway forward pass so the first real frame does not pay for it.
+
+        The first pass on a device sets up GPU kernels and memory, which takes several times
+        longer than any later one. Doing it while the camera is still opening keeps it off the
+        player's first gesture. Nothing here touches the smoothing history.
+        """
+        blank = torch.zeros(1, 3, IMAGE_SIZE, IMAGE_SIZE, device=self.device)
+        with torch.inference_mode():
+            self.model(blank)
+        if self.device.type == "cuda":
+            torch.cuda.synchronize()
+
     def predict_roi(self, roi_bgr: Frame) -> Prediction:
         started = time.perf_counter()
         with torch.inference_mode():
@@ -259,15 +273,3 @@ class DirectionRecognizer:
         self.history.clear()
         self.stable_command = None
         self.previous_stable = None
-
-
-def open_camera(index: int = 0) -> Any:
-    """Open the webcam at the frozen capture size. Returns a `cv2.VideoCapture`."""
-    backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
-    capture = cv2.VideoCapture(index, backend)
-    if not capture.isOpened():
-        capture.release()
-        raise RuntimeError(f"Could not open webcam device {index}.")
-    capture.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    return capture

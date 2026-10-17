@@ -144,6 +144,16 @@ class Game:
         pygame.K_s: "down",
     }
 
+    @staticmethod
+    def _start_pygame() -> None:
+        """Start only the parts of pygame the game uses.
+
+        pygame.init() would also start the joystick and audio systems, which together held the
+        window back for about half a second. Audio starts later, after the first frame.
+        """
+        pygame.display.init()
+        pygame.font.init()
+
     def __init__(
         self,
         caption: str = "Pac-Man - gesture controlled (keyboard)",
@@ -156,7 +166,7 @@ class Game:
         if not headless:
             # Open the window in the middle of the screen rather than wherever the OS likes.
             os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
-        pygame.init()
+        self._start_pygame()
         self.headless = headless
         # Only a real window on a real display plays sound or writes the profile. Headless
         # games, and the dummy video driver the test suites use, do neither.
@@ -180,7 +190,8 @@ class Game:
         )
         self.profile = self.profile_store.load()
         self.theme: Theme = THEMES.get(self.profile.theme, CLASSIC)
-        self.audio = Audio(enabled=self.interactive)
+        # Sound loads right after the first frame (see finish_startup), not before the window.
+        self.audio = Audio(enabled=self.interactive, deferred=True)
         self.audio.muted = self.profile.muted
 
         self.seed = seed
@@ -461,9 +472,15 @@ class Game:
     @property
     def sound_status(self) -> str:
         """What the help screen reports - including when there is no audio device at all."""
-        if not self.audio.available:
+        if not self.audio.available and not self.audio.pending:
             return "unavailable"
         return "off" if self.audio.muted else "on"
+
+    def finish_startup(self) -> None:
+        """Start-up work that can wait until the first frame is on screen: opening the audio
+        device. Called after every frame; does nothing once sound has loaded."""
+        if self.audio.pending:
+            self.audio.load()
 
     @property
     def high_score(self) -> int:
@@ -848,5 +865,6 @@ class Game:
                 self.update(dt)
                 self.draw()
                 pygame.display.flip()
+                self.finish_startup()
         finally:
             pygame.quit()

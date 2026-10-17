@@ -255,6 +255,13 @@ def test_the_frozen_checkpoint_loads_and_predicts_a_full_frame() -> None:
     assert recognizer.metadata["class_to_index"] == {"left": 0, "right": 1, "up": 2, "down": 3}
 
 
+def test_warm_up_runs_the_model_without_touching_the_smoothing_window() -> None:
+    recognizer = DirectionRecognizer(device="cpu")
+    recognizer.warm_up()
+    assert len(recognizer.history) == 0
+    assert recognizer.stable_command is None
+
+
 def test_the_frozen_checkpoint_reads_real_dataset_style_crops() -> None:
     """A clean, centred hand image is recognised confidently and becomes a command in 3 frames."""
     from src.data_pipeline import PROJECT_ROOT

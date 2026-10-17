@@ -7,6 +7,7 @@ error reporting. Nothing here imports torch or OpenCV.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -225,23 +226,77 @@ def test_stopping_during_a_reconnect_is_a_clean_stop_not_an_error() -> None:
     assert state.read().status == "stopped"
 
 
-def test_model_load_failure_is_reported_once_and_never_opens_the_camera() -> None:
+def test_model_load_failure_is_reported_once_and_releases_the_camera() -> None:
+    """The camera opens while the model loads; if the model fails, it is closed straight away."""
     state = SharedState()
-    opened: list[bool] = []
-
-    def camera() -> ScriptedCamera:
-        opened.append(True)
-        return ScriptedCamera()
+    camera = ScriptedCamera()
 
     def broken() -> FakeRecognizer:
         raise RuntimeError("CUDA GPU is required for CNN inference.")
 
-    worker = RecognitionWorker(state, camera_factory=camera, recognizer_factory=broken)
+    worker = RecognitionWorker(state, camera_factory=cameras(camera), recognizer_factory=broken)
     worker.start()
     worker.join(2.0)
-    assert worker.failed and not opened
+    assert worker.failed
+    assert camera.released == 1, "a camera opened in parallel must never be left on"
+    assert camera.reads <= 1, "no frame is processed without a model"
     assert state.read().status == "camera error"
     assert "CUDA GPU is required" in (state.read().error or "")
+
+
+def test_the_camera_opens_while_the_model_is_still_loading() -> None:
+    """Opening the webcam overlaps with loading the model instead of waiting for it."""
+    state = SharedState()
+    camera_opened = threading.Event()
+
+    def camera() -> ScriptedCamera:
+        camera_opened.set()
+        return ScriptedCamera()
+
+    def slow_model() -> FakeRecognizer:
+        # Only finishes once the camera has opened, which proves the two run side by side.
+        assert camera_opened.wait(2.0), "the camera did not open until the model had loaded"
+        return FakeRecognizer()
+
+    worker = RecognitionWorker(
+        state, camera_factory=camera, recognizer_factory=slow_model, mirror=lambda f: f
+    )
+    worker.start()
+    assert wait_for(lambda: state.read().status == "ready")
+    worker.stop()
+    worker.join(2.0)
+    assert not worker.failed
+
+
+def test_the_model_is_warmed_up_before_the_camera_counts_as_ready() -> None:
+    state = SharedState()
+    events: list[str] = []
+
+    class WarmableRecognizer(FakeRecognizer):
+        def warm_up(self) -> None:
+            events.append(f"warm_up while {state.read().status}")
+
+    worker = RecognitionWorker(
+        state,
+        camera_factory=cameras(ScriptedCamera()),
+        recognizer_factory=WarmableRecognizer,
+        mirror=lambda f: f,
+    )
+    worker.start()
+    assert wait_for(lambda: state.read().status == "ready")
+    worker.stop()
+    worker.join(2.0)
+    assert events == ["warm_up while loading model"]
+
+
+def test_a_failing_camera_is_still_reported_after_the_model_loads() -> None:
+    state = SharedState()
+    worker = make_worker(state, cameras(RuntimeError("Could not open webcam device 0.")))
+    worker.start()
+    worker.join(2.0)
+    assert worker.failed
+    assert state.read().status == "camera error"
+    assert "Could not open webcam" in (state.read().error or "")
 
 
 def test_start_is_safe_after_the_worker_has_already_finished() -> None:
@@ -250,7 +305,9 @@ def test_start_is_safe_after_the_worker_has_already_finished() -> None:
     def broken() -> FakeRecognizer:
         raise RuntimeError("no model")
 
-    worker = RecognitionWorker(state, recognizer_factory=broken)
+    worker = RecognitionWorker(
+        state, camera_factory=cameras(ScriptedCamera()), recognizer_factory=broken
+    )
     controller = GestureController(state, worker)
     controller.start()
     worker.join(2.0)

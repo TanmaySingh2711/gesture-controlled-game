@@ -1,4 +1,4 @@
-"""Procedurally synthesised sound effects - no audio files, no extra dependencies.
+"""Procedurally synthesised sound effects - no audio files, only NumPy (already a pygame need).
 
 Sound here is a usability aid, not decoration. When a player is watching their hand in the
 camera panel, the pellet chirp confirms Pac-Man is still moving, and distinct cues mark a power
@@ -19,6 +19,7 @@ import math
 from array import array
 from typing import Final
 
+import numpy as np
 import pygame
 
 log = logging.getLogger(__name__)
@@ -47,33 +48,51 @@ RECIPES: Final[dict[str, list[Part]]] = {
 
 
 def synthesise(parts: list[Part], rate: int = SAMPLE_RATE) -> array[int]:
-    """Signed 16-bit mono samples for a sequence of frequency sweeps."""
-    samples = array("h")
+    """Signed 16-bit mono samples for a sequence of frequency sweeps.
+
+    Vectorised with NumPy: all effects build in a few milliseconds instead of a quarter of a
+    second of per-sample Python, which used to hold up the game window at start-up.
+    """
+    chunks = []
     for start_hz, end_hz, seconds, waveform, volume in parts:
         count = max(1, int(rate * seconds))
         fade_in = max(1, int(rate * _FADE_IN))
         fade_out = max(1, int(rate * _FADE_OUT))
-        phase = 0.0
-        for index in range(count):
-            progress = index / count
-            phase += 2.0 * math.pi * (start_hz + (end_hz - start_hz) * progress) / rate
-            value = math.sin(phase)
-            if waveform == "square":
-                value = 1.0 if value >= 0.0 else -1.0
-            envelope = min(1.0, index / fade_in, (count - index) / fade_out)
-            samples.append(int(value * envelope * volume * 32767))
+        index = np.arange(count, dtype=np.float64)
+        frequency = start_hz + (end_hz - start_hz) * (index / count)
+        value = np.sin(np.cumsum(2.0 * math.pi * frequency / rate))
+        if waveform == "square":
+            value = np.where(value >= 0.0, 1.0, -1.0)
+        envelope = np.minimum(1.0, np.minimum(index / fade_in, (count - index) / fade_out))
+        chunks.append((value * envelope * volume * 32767).astype(np.int16))
+    samples = array("h")
+    samples.frombytes(np.concatenate(chunks).tobytes())
     return samples
 
 
 class Audio:
     """Named sound effects that fail safe: no device means silence, never an exception."""
 
-    def __init__(self, *, enabled: bool = True) -> None:
+    def __init__(self, *, enabled: bool = True, deferred: bool = False) -> None:
+        """`deferred` leaves the device closed until `load()`, so a window can open first.
+
+        Opening the audio device takes about a third of a second and holds the interpreter while
+        it does, so the game opens its window first and loads sound right after the first frame.
+        Until then every effect is a silent no-op.
+        """
         self.muted = False
         self.available = False
+        self._enabled = enabled
+        self.pending = enabled and deferred
         self._sounds: dict[str, pygame.mixer.Sound] = {}
         self._waka_toggle = False
-        if not enabled:
+        if enabled and not deferred:
+            self.load()
+
+    def load(self) -> None:
+        """Open the audio device and build every effect. Does nothing after the first call."""
+        self.pending = False
+        if not self._enabled or self.available:
             return
         try:
             if not pygame.mixer.get_init():
@@ -83,9 +102,9 @@ class Audio:
                 raise pygame.error("mixer did not initialise")
             channels = init[2]
             for name, parts in RECIPES.items():
-                mono = synthesise(parts, init[0])
+                mono = np.frombuffer(synthesise(parts, init[0]).tobytes(), dtype=np.int16)
                 if channels > 1:
-                    mono = array("h", (value for value in mono for _ in range(channels)))
+                    mono = np.repeat(mono, channels)
                 self._sounds[name] = pygame.mixer.Sound(buffer=mono.tobytes())
         except pygame.error as error:
             log.warning("audio unavailable (%s); sound effects are disabled", error)

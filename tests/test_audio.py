@@ -97,3 +97,34 @@ def test_pellet_chirp_alternates_between_its_two_tones(monkeypatch: pytest.Monke
     for _ in range(3):
         audio.waka()
     assert calls == ["waka_a", "waka_b", "waka_a"]
+
+
+def test_deferred_audio_stays_silent_until_loaded_then_loads_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The game opens its window first and loads sound after the first frame."""
+    FakeSound.played = []
+    opened: list[int] = []
+    monkeypatch.setattr(pygame.mixer, "get_init", lambda: (SAMPLE_RATE, -16, 1))
+    monkeypatch.setattr(pygame.mixer, "Sound", FakeSound)
+    monkeypatch.setattr(pygame.mixer, "init", lambda **_kwargs: opened.append(1))
+
+    audio = Audio(enabled=True, deferred=True)
+    assert audio.pending and not audio.available
+    audio.play("power")  # before loading: a silent no-op, never an error
+    assert FakeSound.played == []
+
+    audio.load()
+    assert audio.available and not audio.pending
+    audio.play("power")
+    assert FakeSound.played == [2 * len(synthesise(RECIPES["power"]))]
+
+    audio.load()  # a second call changes nothing
+    assert audio.available
+
+
+def test_disabled_audio_never_becomes_pending() -> None:
+    audio = Audio(enabled=False, deferred=True)
+    assert not audio.pending
+    audio.load()
+    assert not audio.available

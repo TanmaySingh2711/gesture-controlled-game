@@ -5,6 +5,8 @@ rem     run_game.bat --no-camera     keyboard only, no webcam
 rem     run_game.bat --device cpu    run the gesture model on the CPU
 rem ESC in the game closes the game and this window together.
 setlocal
+rem pygame prints a two-line greeting on import; keep the window clean.
+set "PYGAME_HIDE_SUPPORT_PROMPT=1"
 cd /d "%~dp0"
 
 if not exist "venv\Scripts\python.exe" (

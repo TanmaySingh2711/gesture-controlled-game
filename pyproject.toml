@@ -83,6 +83,9 @@ ignore = [
 # The worker imports OpenCV and the recognizer lazily, inside the thread, so that a keyboard-only
 # process - and the whole `game` package - never loads torch or cv2.
 "src/game_integration.py" = ["PLC0415"]
+# Matplotlib loads only when training draws its curves; the game imports this module for the
+# checkpoint loader and must not pay for a plotting library at start-up.
+"src/train_model.py" = ["PLC0415"]
 # The installer's whole job is running fixed commands (the venv's pip, nvidia-smi), and it reads
 # the Windows registry only on Windows, where `winreg` exists.
 "install.py" = ["S603", "PLC0415"]

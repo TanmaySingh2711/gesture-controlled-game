@@ -6,7 +6,7 @@ Run date: 2026-09-13 · Windows 11 · Python 3.12.10 · PyTorch 2.14.0 + CUDA 13
 **Status: PASSED — automated, structured and manual acceptance testing all passed. Project COMPLETE.**
 
 > File paths below are as they were on the run date. Since then the split files moved into
-> `dataset/`, the P5 results from `model/` into `reports/p5_evaluation/`, and this report into
+> `dataset/`, the P5 results from `model/` into `reports/test_evaluation/`, and this report into
 > `docs/`; every moved file is byte-identical. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
@@ -131,7 +131,7 @@ modules); one worker check started a real worker and has been replaced with a de
 ### Live gesture trials, recomputed from the saved records
 
 The person-in-front-of-the-camera trials were recorded at P6 (2026-09-13) in
-`reports/p6_live/*.csv`. The figures below were recomputed from those files, so they are checked
+`reports/live_trials/*.csv`. The figures below were recomputed from those files, so they are checked
 against the records and not only quoted from earlier text. No new live run was made for this
 check, and the recognition path (model, threshold 0.90, smoothing 3-of-5) is unchanged since.
 

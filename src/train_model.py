@@ -35,15 +35,10 @@ from collections.abc import Sized
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-import matplotlib
-from torch.utils.data import DataLoader
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 from torchvision.models import MobileNet_V2_Weights, mobilenet_v2
 
 from src.data_pipeline import (
@@ -540,6 +535,13 @@ def print_validation_breakdown(confusion: Any) -> dict[str, Any]:
 
 def plot_curves(history: list[dict[str, Any]], best: dict[str, Any]) -> None:
     """Loss and accuracy over epochs, train and validation only - no test metrics."""
+    # Matplotlib loads only here: the game imports this module for the checkpoint loader and
+    # should not spend a third of a second on a plotting library it never uses.
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     steps = list(range(1, len(history) + 1))
     boundary = sum(1 for row in history if row["stage"] == "stage1_head")
     figure, axes = plt.subplots(1, 2, figsize=(12, 4.5))

@@ -226,10 +226,50 @@ def picture_problem(frame: Any) -> str | None:
 
 
 def _real_camera() -> Capture:
-    from src.gesture_recognizer import open_camera
+    # src.camera needs only OpenCV, so this can run while PyTorch is still loading.
+    from src.camera import open_camera
 
     capture: Capture = open_camera()
+    # The first read after opening is far slower than the rest; take it now, off the critical path.
+    capture.read()
     return capture
+
+
+class _CameraOpener(threading.Thread):
+    """Opens the webcam on its own thread, so it overlaps with loading the model.
+
+    OpenCV releases the interpreter while it waits for the device, so the camera really does open
+    in parallel with the PyTorch import instead of after it.
+    """
+
+    def __init__(self, factory: Callable[[], Capture]) -> None:
+        super().__init__(name="camera-opener", daemon=True)
+        self._factory = factory
+        self._capture: Capture | None = None
+        self._error: Exception | None = None
+
+    def run(self) -> None:
+        try:
+            self._capture = self._factory()
+        except Exception as error:  # noqa: BLE001 - re-raised by take(), shown as CAMERA ERROR
+            self._error = error
+
+    def take(self) -> Capture:
+        """Wait for the camera and hand it over, or raise what opening it raised."""
+        self.join()
+        if self._error is not None:
+            raise self._error
+        capture, self._capture = self._capture, None
+        if capture is None:
+            raise RuntimeError("the webcam opener finished without a camera")
+        return capture
+
+    def discard(self) -> None:
+        """Release a camera that was opened but never handed over (the model failed, or a stop)."""
+        self.join()
+        if self._capture is not None:
+            self._capture.release()
+            self._capture = None
 
 
 def _cv2_mirror(frame: Any) -> Any:
@@ -392,18 +432,29 @@ class RecognitionWorker(threading.Thread):
             return capture
         return None
 
+    def _start_up(self, opener: _CameraOpener) -> tuple[Recognizer, Capture]:
+        """Load and warm up the model while the camera opens, then take the open camera."""
+        self.state.publish(status="loading model", camera_ok=False)
+        recognizer = self._recognizer_factory()
+        self.recognizer = recognizer
+        warm_up = getattr(recognizer, "warm_up", None)
+        if callable(warm_up):
+            warm_up()
+        device = str(getattr(recognizer, "device", ""))
+        log.info("gesture recognition running on %s", device or "an unknown device")
+
+        self.state.publish(status="opening camera", device=device)
+        capture = opener.take()
+        self.state.publish(status="ready", camera_ok=True, error=None)
+        return recognizer, capture
+
     def run(self) -> None:
         capture: Capture | None = None
+        # The camera opens while the model loads: the two used to run one after the other.
+        opener = _CameraOpener(self._camera_factory)
+        opener.start()
         try:
-            self.state.publish(status="loading model", camera_ok=False)
-            recognizer = self._recognizer_factory()
-            self.recognizer = recognizer
-            device = str(getattr(recognizer, "device", ""))
-            log.info("gesture recognition running on %s", device or "an unknown device")
-
-            self.state.publish(status="opening camera", device=device)
-            capture = self._camera_factory()
-            self.state.publish(status="ready", camera_ok=True, error=None)
+            recognizer, capture = self._start_up(opener)
             self.started_at = time.perf_counter()
 
             failures = 0
@@ -463,6 +514,8 @@ class RecognitionWorker(threading.Thread):
         finally:
             if capture is not None:
                 capture.release()
+            # A camera that opened while the model failed to load is closed straight away.
+            opener.discard()
             self._publish_exit()
 
     # --- statistics, for the performance report ----------------------------------------

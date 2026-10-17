@@ -6,6 +6,18 @@ each verified before the next began; the entries below follow those phases.
 ## [Unreleased] - reach, honesty and evidence round
 
 ### Changed
+- **Faster start-up.** The game window now opens in about 0.6 s after a double-click instead of
+  about 1.1 s: only the pygame systems the game uses are started (no joystick system), the
+  audio device opens just after the first frame instead of before the window, and the sound
+  effects are generated with NumPy (2 ms instead of about 180 ms). Gesture control is also
+  ready sooner: the webcam opens on its own thread while PyTorch loads (`src/camera.py` needs
+  only OpenCV), the model runs one warm-up pass before the first real frame, and Matplotlib is
+  no longer loaded at start-up. Launch to the first recognised gesture went from about 7 s to
+  about 5 s on the development laptop.
+- **Clearer folder names.** `reports/p5_evaluation/` is now `reports/test_evaluation/` and
+  `reports/p6_live/` is now `reports/live_trials/`. The files inside are unchanged; every script
+  and document now points to the new names. A new [docs/README.md](README.md) lists every
+  document and explains the P1 to P7 and Objective 9 to 11 phase labels used in them.
 - **Bigger camera view.** The preview of what the CNN sees grew from 200 x 200 to 376 x 376 px
   (3.5 times the area), so hand position is easy to judge mid-game. The panel is 432 px wide
   (window 992 x 704): the current gesture and the gesture key sit side by side under the
