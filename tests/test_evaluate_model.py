@@ -19,10 +19,17 @@ torch = pytest.importorskip("torch")
 from src import evaluate_model as ev
 from src.data_pipeline import CLASSES, load_split
 
-pytestmark = [pytest.mark.gpu, pytest.mark.slow]
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
+
+pytestmark = [
+    pytest.mark.gpu,
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        not any(DATASET.rglob("*.jpg")), reason="dataset images are not tracked in git"
+    ),
+]
 
 P5_ARTEFACTS = (ev.METRICS_PATH, ev.PREDICTIONS_PATH, ev.CONFUSION_PATH)
-DATASET = Path(__file__).resolve().parent.parent / "dataset"
 
 
 def digests(paths: tuple[str, ...]) -> dict[str, str]:

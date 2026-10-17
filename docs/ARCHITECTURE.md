@@ -33,6 +33,7 @@ flowchart LR
 | `game/` | Pygame, the maze, the rules | `torch`, `cv2`, anything in `src/` |
 | `src/game_integration.py` | The game's public seam, a recognizer protocol | Pygame drawing |
 | `src/gesture_recognizer.py` | The CNN, OpenCV preprocessing | Pygame, the game |
+| `src/camera.py` | OpenCV: the capture size, the ROI and opening the webcam | PyTorch, Pygame |
 | `src/play_gesture.py` | Both sides, to assemble the application | - |
 
 The boundary is enforced, not just intended: `python game/main.py --selftest` parses every module

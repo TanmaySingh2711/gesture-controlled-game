@@ -28,7 +28,8 @@ torch = pytest.importorskip("torch")
 cv2 = pytest.importorskip("cv2")
 
 from src import realtime_gesture
-from src.gesture_recognizer import FRAME_HEIGHT, FRAME_WIDTH, ROI_X1, ROI_Y1, Prediction
+from src.camera import FRAME_HEIGHT, FRAME_WIDTH, ROI_X1, ROI_Y1
+from src.gesture_recognizer import Prediction
 from src.realtime_gesture import (
     KEY_ACTIONS,
     NO_COMMAND_CATEGORIES,

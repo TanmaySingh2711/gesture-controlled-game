@@ -249,6 +249,12 @@ def test_ambusher_targets_four_tiles_ahead(
     assert ghost_named(maze, "ambusher").chase_target(player, None) == expected
 
 
+def test_ambusher_aims_ahead_of_a_stopped_player_the_way_it_faces(maze: Maze) -> None:
+    player = player_at(maze, (22, 13), "right")
+    player.direction = None  # stopped against a wall, still facing right
+    assert ghost_named(maze, "ambusher").chase_target(player, None) == (22, 17)
+
+
 def test_flanker_reflects_the_chaser_through_the_pivot(maze: Maze) -> None:
     ghosts = make_ghosts(maze)
     chaser, flanker = ghosts[0], ghosts[2]

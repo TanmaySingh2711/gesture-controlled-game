@@ -1,7 +1,7 @@
 # Manual Test Plan
 
 The checks a person has to make, because they depend on a real hand, a real webcam, real eyes and
-real ears. Automated suites cover the logic underneath every row (`pytest`, plus the three
+real ears. Automated suites cover the logic underneath every row (`pytest`, which also runs the
 self-test scripts); this plan covers whether it actually works and feels right.
 
 **Setup:** normal indoor lighting, sit about an arm's length from the webcam, launch

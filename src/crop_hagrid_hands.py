@@ -7,11 +7,11 @@ ROI. This script closes that domain gap by cropping each sample to its annotated
 
 Source (verified when the dataset was first built, and reused unchanged for P2)
 ------------------------------------------------------------------------------
-`cj-mills/hagrid-sample-500k-384p` — 509,323 HaGRID images downscaled to 384p, CC-BY-SA-4.0.
+`cj-mills/hagrid-sample-500k-384p` - 509,323 HaGRID images downscaled to 384p, CC-BY-SA-4.0.
 Crucially this archive is a pure downscale, so HaGRID's normalized bounding boxes still line
 up with the pixels, and it bundles the official `ann_train_val/*.json` annotations. (The 150k
 classification repack tried first was cropped rather than resized, so official boxes do NOT
-align with it — that was verified by overlaying boxes on those images, and is the reason the
+align with it - that was verified by overlaying boxes on those images, and is the reason the
 image source changed to this one.)
 
 The 13.4 GB archive is never downloaded in full: it is read over HTTP range requests, so only
@@ -138,7 +138,8 @@ class RangeFile(io.RawIOBase):
 
 def open_archive() -> tuple[RangeFile, zipfile.ZipFile]:
     head = urllib.request.Request(ARCHIVE_URL, method="HEAD")
-    size = int(urllib.request.urlopen(head, timeout=120).headers["Content-Length"])
+    with urllib.request.urlopen(head, timeout=120) as response:
+        size = int(response.headers["Content-Length"])
     handle = RangeFile(ARCHIVE_URL, size)
     return handle, zipfile.ZipFile(handle)
 

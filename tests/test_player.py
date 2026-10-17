@@ -125,6 +125,14 @@ def test_facing_angle(maze: Maze, direction: str | None, angle: float) -> None:
     assert player.facing_angle == angle
 
 
+def test_a_player_stopped_by_a_wall_keeps_facing_the_way_it_went(maze: Maze) -> None:
+    player = Player(maze)
+    player.reset_to((22, 10), "right")
+    run(player, Controls(), 3.0)  # the wall at column 24 stops it on column 23
+    assert player.direction is None
+    assert (player.facing, player.facing_angle) == ("right", 0.0)
+
+
 # --- entity ------------------------------------------------------------------------------
 def test_entity_geometry(maze: Maze) -> None:
     a = Entity(maze, (1, 1))

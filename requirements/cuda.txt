@@ -13,7 +13,7 @@
 #     pip install opencv-python pygame numpy matplotlib scikit-learn pillow
 #
 # If you ever move this project to a machine with an older NVIDIA driver, swap cu130 for the
-# CUDA build that driver supports (for example cu126) — never drop the --index-url entirely.
+# CUDA build that driver supports (for example cu126) - never drop the --index-url entirely.
 
 --index-url https://download.pytorch.org/whl/cu130
 --extra-index-url https://pypi.org/simple

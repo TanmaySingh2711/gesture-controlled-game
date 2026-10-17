@@ -31,7 +31,16 @@ from typing import TYPE_CHECKING, Final
 
 import pygame
 
-from game.engine import FPS, GAME_OVER, WINDOW_HEIGHT, WINDOW_WIDTH, Game
+from game.engine import (
+    DYING,
+    FPS,
+    GAME_OVER,
+    READY,
+    ROUND_CLEAR,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
+    Game,
+)
 from game.theme import CLASSIC, Color, Theme
 from src.game_integration import GestureController, Snapshot
 
@@ -337,7 +346,7 @@ class GesturePacman:
         # Drop stale intent whenever play pauses: death, round change, ready screen. The camera
         # and the model keep running; only the control state is cleared.
         if self.game.state != self.previous_state:
-            if self.game.state in ("dying", "round_clear", "ready") and self.controller:
+            if self.game.state in (DYING, ROUND_CLEAR, READY) and self.controller:
                 self.controller.reset()
             self.previous_state = self.game.state
 
@@ -572,7 +581,8 @@ class GesturePacman:
         """Timed run with everything live, then an integration report."""
         self.start()
         self.begin_play()  # measure gameplay, not the menu
-        print(f"running {frames} game frames with recognition active...")
+        mode = "recognition active" if self.controller is not None else "keyboard only"
+        print(f"running {frames} game frames with {mode}...")
         released = False
         try:
             for _ in range(frames):

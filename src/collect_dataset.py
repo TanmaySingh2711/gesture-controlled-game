@@ -5,8 +5,8 @@ The project dataset comes from HaGRID hand-region crops, built by
 
   * capturing a small set of custom webcam images to sanity-check the trained model on the
     machine it will actually run on, and
-  * as the reference implementation of the capture geometry (flip-then-crop and the fixed
-    ROI constants below) that real-time gameplay inference must reuse.
+  * as a working example of the capture geometry (flip-then-crop with the fixed ROI from
+    `src/camera.py`) that real-time gameplay inference shares.
 
 Do not use it to build the training set. Its on-screen gesture hints follow the P1 mapping
 frozen for the Pac-Man direction: fist / palm / like / dislike.
@@ -41,15 +41,10 @@ from typing import Any
 
 import cv2
 
-# --- Fixed capture geometry -------------------------------------------------------------
-# Webcam feed is 640x480. The ROI is a 300x300 square on the right-hand side of the FLIPPED
-# preview, which is where a right hand naturally sits in a mirror view, vertically centred.
-# These four numbers are the contract between dataset collection and gameplay inference:
-# any later script that feeds the CNN must crop exactly this region from a flipped frame.
-FRAME_WIDTH = 640
-FRAME_HEIGHT = 480
-ROI_X1, ROI_Y1 = 300, 90
-ROI_X2, ROI_Y2 = 600, 390
+# The capture geometry is the contract between dataset collection and gameplay inference, so it
+# is defined once, in src/camera.py, and shared.
+from src.camera import FRAME_HEIGHT, FRAME_WIDTH, ROI_X1, ROI_X2, ROI_Y1, ROI_Y2, open_camera
+
 ROI_SIZE = (ROI_X2 - ROI_X1, ROI_Y2 - ROI_Y1)  # (300, 300)
 
 TARGET_PER_CLASS = 400
@@ -158,15 +153,6 @@ def draw_overlay(display: Any, label: str, counts: dict[str, int], capturing: bo
         (255, 255, 255),
         1,
     )
-
-
-def open_camera() -> Any:
-    capture = cv2.VideoCapture(0, cv2.CAP_DSHOW if os.name == "nt" else 0)
-    if not capture.isOpened():
-        raise RuntimeError("Could not open webcam device 0.")
-    capture.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    return capture
 
 
 def selftest() -> int:

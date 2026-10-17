@@ -96,4 +96,4 @@ class Player(Entity):
     @property
     def facing_angle(self) -> float:
         """Degrees anticlockwise from east, for drawing the mouth wedge."""
-        return FACING_ANGLE.get(self.direction or "left", 180.0)
+        return FACING_ANGLE[self.facing]

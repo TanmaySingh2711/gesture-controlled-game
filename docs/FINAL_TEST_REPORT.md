@@ -1,9 +1,9 @@
-# Final Test Report — CNN Gesture Controlled Pac-Man
+# Final Test Report - CNN Gesture Controlled Pac-Man
 
-**Objective 11 — Test the Complete Application**
+**Objective 11 - Test the Complete Application**
 Run date: 2026-09-13 · Windows 11 · Python 3.12.10 · PyTorch 2.14.0 + CUDA 13.0
 
-**Status: PASSED — automated, structured and manual acceptance testing all passed. Project COMPLETE.**
+**Status: PASSED - automated, structured and manual acceptance testing all passed. Project COMPLETE.**
 
 > File paths below are as they were on the run date. Since then the split files moved into
 > `dataset/`, the P5 results from `model/` into `reports/test_evaluation/`, and this report into
@@ -17,7 +17,7 @@ Run date: 2026-09-13 · Windows 11 · Python 3.12.10 · PyTorch 2.14.0 + CUDA 13
 |---|---|
 | Launch | `python src/play_gesture.py` |
 | Keyboard-only | `python src/play_gesture.py --no-camera` |
-| Model | `model/best_direction_model.pt` — MobileNetV2, 4 classes, 160×160 |
+| Model | `model/best_direction_model.pt` - MobileNetV2, 4 classes, 160×160 |
 | Mapping | Fist → LEFT · Open palm → RIGHT · Thumbs up → UP · Thumbs down → DOWN |
 | Recognition | threshold 0.90 · smoothing 3-of-5 · 300×300 ROI · mirrored webcam |
 | Offline accuracy | 99.00% on the untouched 200-image test split (P5) |
@@ -66,7 +66,7 @@ wrapped existing functions to count model constructions and camera opens/release
 
 Startup status progressed `loading model → opening camera → ready` every time.
 
-### Stability run — 330 seconds, 30 s windows
+### Stability run - 330 seconds, 30 s windows
 
 | Window end (s) | Game FPS | Camera FPS | CNN mean (ms) | CNN p95 (ms) | Snapshot age mean (ms) | writes − frames |
 |---|---|---|---|---|---|---|
@@ -87,7 +87,7 @@ median 17.12, p95 27.40**. Six Game Over → R restarts occurred live without a 
 or camera reopen.
 
 - **No backlog:** `writes − frames` stayed exactly 3 (the startup status publishes) for the
-  whole run — one snapshot slot, never a queue.
+  whole run - one snapshot slot, never a queue.
 - **No lag growth:** the age of the snapshot the game acted on stayed ~17 ms from first window
   to last.
 - **No degradation:** game and camera rates were flat across all eleven windows.
@@ -104,6 +104,11 @@ or camera reopen.
 | `dataset/` | 2,004 files, newest 2026-09-13 00:50:31 | | | unchanged |
 
 No training, fine-tuning, dataset edit or checkpoint replacement occurred.
+
+Since this test the four JSON files have been stored with LF line endings and moved:
+`direction_evaluation_metrics.json` to `reports/test_evaluation/`, and the split and mapping
+files to `dataset/`. Converted back to CRLF, each still gives exactly the MD5 above, and the
+checkpoint is unchanged byte for byte.
 
 ## 5. Defects
 
@@ -149,7 +154,7 @@ person, so they show the recognizer works live; they are not a population accura
 ## 7. Known limitation
 
 The CNN has no reject/background class. A deliberate, well-formed gesture outside the four
-commands (a peace sign, three fingers) can be confidently classified as one of them — measured
+commands (a peace sign, three fingers) can be confidently classified as one of them - measured
 at P6 as RIGHT at 99.3%. Relaxed and absent hands are correctly rejected by the 0.90 threshold.
 This was accepted by design; the start screen instructs "Use only the four gestures shown above."
 

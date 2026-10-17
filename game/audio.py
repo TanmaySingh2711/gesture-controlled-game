@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import math
-from array import array
 from typing import Final
 
 import numpy as np
@@ -47,7 +46,7 @@ RECIPES: Final[dict[str, list[Part]]] = {
 }
 
 
-def synthesise(parts: list[Part], rate: int = SAMPLE_RATE) -> array[int]:
+def synthesise(parts: list[Part], rate: int = SAMPLE_RATE) -> np.ndarray:
     """Signed 16-bit mono samples for a sequence of frequency sweeps.
 
     Vectorised with NumPy: all effects build in a few milliseconds instead of a quarter of a
@@ -65,9 +64,7 @@ def synthesise(parts: list[Part], rate: int = SAMPLE_RATE) -> array[int]:
             value = np.where(value >= 0.0, 1.0, -1.0)
         envelope = np.minimum(1.0, np.minimum(index / fade_in, (count - index) / fade_out))
         chunks.append((value * envelope * volume * 32767).astype(np.int16))
-    samples = array("h")
-    samples.frombytes(np.concatenate(chunks).tobytes())
-    return samples
+    return np.concatenate(chunks)
 
 
 class Audio:
@@ -102,7 +99,7 @@ class Audio:
                 raise pygame.error("mixer did not initialise")
             channels = init[2]
             for name, parts in RECIPES.items():
-                mono = np.frombuffer(synthesise(parts, init[0]).tobytes(), dtype=np.int16)
+                mono = synthesise(parts, init[0])
                 if channels > 1:
                     mono = np.repeat(mono, channels)
                 self._sounds[name] = pygame.mixer.Sound(buffer=mono.tobytes())

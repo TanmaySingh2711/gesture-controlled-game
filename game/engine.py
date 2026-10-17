@@ -718,9 +718,9 @@ class Game:
             pygame.draw.lines(self.screen, theme.frightened_face, False, points, 2)
             return
 
-        look_x, look_y = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}.get(
-            ghost.direction or "left", (-1, 0)
-        )
+        look_x, look_y = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}[
+            ghost.facing
+        ]
         for offset in (-radius * 0.38, radius * 0.38):
             eye = (int(x + offset), int(y - radius * 0.25))
             pygame.draw.circle(self.screen, theme.eye, eye, int(radius * 0.28))

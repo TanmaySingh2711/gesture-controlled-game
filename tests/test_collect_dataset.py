@@ -195,17 +195,6 @@ def test_the_overlay_marks_the_roi_in_the_state_colour(done: int, capturing: boo
 
 
 # --- camera and self-test ------------------------------------------------------------------
-def test_open_camera_sets_the_capture_size_or_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    camera = ScriptedCamera([])
-    monkeypatch.setattr(cd.cv2, "VideoCapture", lambda *_args: camera)
-    assert cd.open_camera() is camera
-    assert camera.settings[cv2.CAP_PROP_FRAME_WIDTH] == cd.FRAME_WIDTH
-
-    monkeypatch.setattr(cd.cv2, "VideoCapture", lambda *_args: ScriptedCamera([], opened=False))
-    with pytest.raises(RuntimeError, match="Could not open webcam"):
-        cd.open_camera()
-
-
 def test_the_selftest_checks_flip_roi_and_folders(
     dataset: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

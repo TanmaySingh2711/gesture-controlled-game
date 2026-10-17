@@ -45,8 +45,7 @@ import cv2
 import torch
 from PIL import Image
 
-# Re-exported: the capture size and open_camera() have always been importable from here.
-from src.camera import FRAME_HEIGHT, FRAME_WIDTH, open_camera  # noqa: F401
+from src.camera import ROI_X1, ROI_X2, ROI_Y1, ROI_Y2
 from src.data_pipeline import CLASS_TO_INDEX, IMAGE_SIZE, inference_transform
 from src.train_model import CHECKPOINT_PATH, load_direction_checkpoint
 
@@ -64,14 +63,6 @@ INDEX_TO_DIRECTION: Final[dict[int, str]] = {index: name for name, index in CLAS
 NO_COMMAND_LABEL: Final = "NO COMMAND"
 
 EXPECTED_TASK: Final = "pacman_direction_v1"
-
-# Fixed capture geometry, frozen in docs/PROJECT_SPEC.md section 7 and unchanged since the dataset
-# was built. The frame size lives in src/camera.py; the ROI is what the CNN sees, and everything
-# outside it is ignored.
-ROI_X1: Final = 300
-ROI_Y1: Final = 90
-ROI_X2: Final = 600
-ROI_Y2: Final = 390
 
 # Frozen after the P6 live trials, on live evidence rather than inherited from the retired
 # project: intentional gestures never fell below 0.961 confidence while idle and absent hands
@@ -100,6 +91,15 @@ def label_of(command: str | None) -> str:
     return NO_COMMAND_LABEL if command is None else command.upper()
 
 
+def cuda_usable() -> bool:
+    """Whether there is a CUDA GPU to run on.
+
+    The device count is checked too: on Windows an empty CUDA_VISIBLE_DEVICES makes PyTorch report
+    CUDA as available while listing no device, and the first use of the GPU then crashes.
+    """
+    return bool(torch.cuda.is_available() and torch.cuda.device_count() > 0)
+
+
 def select_device(preference: str = "auto") -> torch.device:
     """The device recognition runs on: CUDA when present, otherwise the CPU.
 
@@ -108,9 +108,9 @@ def select_device(preference: str = "auto") -> torch.device:
     """
     if preference not in DEVICE_CHOICES:
         raise ValueError(f"device must be one of {', '.join(DEVICE_CHOICES)}, got {preference!r}")
-    if preference == "cuda" and not torch.cuda.is_available():
+    if preference == "cuda" and not cuda_usable():
         raise RuntimeError("--device cuda was requested, but no CUDA GPU is available.")
-    if preference != "cpu" and torch.cuda.is_available():
+    if preference != "cpu" and cuda_usable():
         return torch.device("cuda")
     torch.set_num_threads(min(CPU_THREADS, os.cpu_count() or 1))
     return torch.device("cpu")

@@ -78,7 +78,9 @@ def check_torch_and_cuda() -> None:
 
     print(f"       built against CUDA {torch.version.cuda}")
 
-    if not torch.cuda.is_available():
+    # The device count too: an empty CUDA_VISIBLE_DEVICES on Windows makes PyTorch report CUDA as
+    # available with no device to use.
+    if not (torch.cuda.is_available() and torch.cuda.device_count() > 0):
         # Not a failure: gesture recognition runs on the CPU. Only retraining needs CUDA.
         print("[INFO] CUDA               not available - gesture recognition will use the CPU")
         return

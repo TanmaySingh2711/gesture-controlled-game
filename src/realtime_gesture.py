@@ -55,6 +55,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from src.camera import FRAME_HEIGHT, FRAME_WIDTH, ROI_X1, ROI_X2, ROI_Y1, ROI_Y2, open_camera
 from src.data_pipeline import CLASS_TO_INDEX, PROJECT_ROOT, eval_transform
 from src.game_integration import PredictionLike
 from src.gesture_recognizer import (
@@ -64,17 +65,10 @@ from src.gesture_recognizer import (
     DEVICE_CHOICES,
     DIRECTION_HELP,
     DIRECTIONS,
-    FRAME_HEIGHT,
-    FRAME_WIDTH,
     NO_COMMAND_LABEL,
-    ROI_X1,
-    ROI_X2,
-    ROI_Y1,
-    ROI_Y2,
     DirectionRecognizer,
     Prediction,
     label_of,
-    open_camera,
 )
 from src.paths import shown
 

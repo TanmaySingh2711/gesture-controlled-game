@@ -18,7 +18,15 @@ pytest.importorskip("torch")
 
 from src import train_model
 
-pytestmark = [pytest.mark.gpu, pytest.mark.slow]
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
+
+pytestmark = [
+    pytest.mark.gpu,
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        not any(DATASET.rglob("*.jpg")), reason="dataset images are not tracked in git"
+    ),
+]
 
 
 def test_training_runs_end_to_end_without_touching_the_frozen_checkpoint(

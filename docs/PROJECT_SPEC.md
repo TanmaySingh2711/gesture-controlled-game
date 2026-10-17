@@ -1,9 +1,16 @@
-# PROJECT SPECIFICATION — Pac-Man Revision (Frozen)
+# PROJECT SPECIFICATION - Pac-Man Revision (Frozen)
+
+> **Reading this document.** It records the design and each phase as they were decided and
+> finished, and is kept unchanged as that record. Some details have moved on since: the window
+> is now 992x704 with a 432 px gesture panel, `game/game.py` became `game/engine.py`, the
+> endless-runner archive folders it mentions were removed from the repository, and the
+> recognizer can run on the CPU. [CHANGELOG.md](CHANGELOG.md) lists every later change, and the
+> [main README](../README.md) describes the project as it is now.
 
 > **Revision notice.** This document replaces the previous endless-runner specification in
 > full. The project is now a Pac-Man-style maze game, and the CNN command set is
 > LEFT / RIGHT / UP / DOWN with no NEUTRAL class. Everything specific to the old
-> obstacle-dodger design — JUMP, NEUTRAL, gravity, ground lanes, cacti — is withdrawn and must
+> obstacle-dodger design - JUMP, NEUTRAL, gravity, ground lanes, cacti - is withdrawn and must
 > not be carried forward. Section 18 records exactly what survives the migration.
 
 ## 1. Project Title
@@ -79,7 +86,7 @@ Rules for the player:
 they were measured at 100% live accuracy over 25 trials each. `like` and `dislike` are genuine
 HaGRID classes, are easy to perform, and map intuitively onto up and down.
 
-**Known risk — an orientation-dependent pair.** `like` and `dislike` are largely the same hand
+**Known risk - an orientation-dependent pair.** `like` and `dislike` are largely the same hand
 shape rotated about 180°, which makes them the hardest pair in this set, much as
 pointing-left/pointing-right was in the original design. Two consequences are binding:
 
@@ -95,8 +102,8 @@ gestures encodes a left/right direction in its own shape.
 
 Unchanged from the previous design and still frozen:
 
-- Every webcam frame is **horizontally flipped immediately after capture**, at every stage —
-  dataset work, real-time prediction and gameplay — so a player watching themselves sees a
+- Every webcam frame is **horizontally flipped immediately after capture**, at every stage -
+  dataset work, real-time prediction and gameplay - so a player watching themselves sees a
   natural mirror and the model never meets a differently-oriented image than the one on screen.
 - Only a **fixed 300x300 region of interest** at x 300-600, y 90-390 of the 640x480 frame is
   sent to the CNN. No hand tracking, segmentation or second model is used.
@@ -144,13 +151,13 @@ Four ghosts, each with a distinct role, using our own names and colours:
 
 Ghost state machine, faithful to the original:
 
-- **Scatter** — each ghost heads for its own corner of the maze.
-- **Chase** — each ghost pursues its role's target tile.
+- **Scatter** - each ghost heads for its own corner of the maze.
+- **Chase** - each ghost pursues its role's target tile.
 - The game alternates scatter and chase on a fixed schedule (approximately 7 s scatter / 20 s
   chase for the first phases, settling into permanent chase later in the round).
-- **Frightened** — triggered by a power pellet. Ghosts reverse direction, slow down, wander, and
+- **Frightened** - triggered by a power pellet. Ghosts reverse direction, slow down, wander, and
   become edible. The mode ends after a fixed duration, with a visible warning flash near the end.
-- **Eaten** — an eaten ghost becomes a pair of eyes that returns to the ghost house at high speed,
+- **Eaten** - an eaten ghost becomes a pair of eyes that returns to the ghost house at high speed,
   then re-enters play in its normal state.
 - Ghosts reverse direction when the global mode changes, as in the original.
 - Ghosts leave the ghost house on a simple timed schedule at the start of each life and round.
@@ -208,7 +215,7 @@ old endless-runner control model.
 6. Temporal smoothing still applies: a direction must be predicted consistently across a short
    rolling window before it becomes a request, so a single misclassified frame cannot turn the
    player. When no class holds the majority, the result is "no new command".
-7. Repeating the same direction request is harmless — it is idempotent — so a held gesture simply
+7. Repeating the same direction request is harmless - it is idempotent - so a held gesture simply
    keeps the same request current. No edge-triggering is required, unlike the old one-shot JUMP.
 
 ## 10. Minimum Required Features
@@ -279,13 +286,13 @@ rounds, and reach Game Over. The demo makes the chain visible end to end:
 
 ## 14. Technology Direction
 
-- **Python 3.12.10** — main language, in the project-local `venv/`.
-- **PyTorch 2.14.0 + torchvision 0.29.0 (CUDA 13.0 build)** — CNN definition, training,
+- **Python 3.12.10** - main language, in the project-local `venv/`.
+- **PyTorch 2.14.0 + torchvision 0.29.0 (CUDA 13.0 build)** - CNN definition, training,
   inference.
-- **OpenCV 5.0.0** — webcam capture, flipping, ROI cropping, preprocessing.
-- **Pygame 2.6.1** — maze rendering, game loop, timing.
-- **NumPy, Matplotlib, scikit-learn, pyarrow** — arrays, plots, metrics, dataset preparation.
-- **Dataset** — a balanced subset of [HaGRID](https://github.com/hukenovs/hagrid)
+- **OpenCV 5.0.0** - webcam capture, flipping, ROI cropping, preprocessing.
+- **Pygame 2.6.1** - maze rendering, game loop, timing.
+- **NumPy, Matplotlib, scikit-learn, pyarrow** - arrays, plots, metrics, dataset preparation.
+- **Dataset** - a balanced subset of [HaGRID](https://github.com/hukenovs/hagrid)
   (Kapitanov et al.), CC-BY-SA-4.0, taken from `cj-mills/hagrid-sample-500k-384p` together with
   the official `ann_train_val` bounding-box annotations bundled in that archive. Images are
   cropped to the annotated hand box with 25% padding and squared off, so training data resembles
@@ -323,7 +330,7 @@ Carried over unchanged except for the class set. **Implemented and verified in P
   cannot be lost to a later edit.
 - **Loaders:** batch 32, train shuffled, validation and test in fixed order, 2 workers,
   pinned memory, persistent workers.
-- **Validation and test:** resize, tensor, normalize only — fully deterministic.
+- **Validation and test:** resize, tensor, normalize only - fully deterministic.
 - **Inference contract:** webcam code reuses the evaluation transform exactly, via
   `data_pipeline.inference_transform()`.
 
@@ -338,7 +345,7 @@ as the tie-break. The test split is never loaded during training.
 
 **Trained in P4:** `model/best_direction_model.pt`, 2,228,996 parameters, best validation
 accuracy 0.9950 (199/200) at validation loss 0.0362, stage 2 epoch 8. Per class: left 49/50,
-right 50/50, up 50/50, down 50/50 — zero `up`/`down` confusion in either direction.
+right 50/50, up 50/50, down 50/50 - zero `up`/`down` confusion in either direction.
 
 Every checkpoint records its own class mapping, and `load_direction_checkpoint()` refuses one
 that disagrees with the active mapping. This matters because the retired endless-runner
@@ -355,7 +362,7 @@ checkpoint also has four outputs and would otherwise load without error while me
 | HaGRID source, annotation cropping approach | **Reused** (P2) | `like` (27,721 images) and `dislike` (28,537) are present in the same archive and annotation set |
 | `dataset/left` (fist), `dataset/right` (palm) | **Reused as-is** (P2) | 500 images each, verified and kept untouched; the mapping is unchanged |
 | `dataset/up` (like), `dataset/down` (dislike) | **Built** (P2) | 500 annotation-aligned crops each, from their own genuine HaGRID classes |
-| `dataset/jump` (peace), `dataset/neutral` (no_gesture) | **Obsolete** — archived (P2) | Moved to `dataset_archive_endless_runner/`, outside the active dataset |
+| `dataset/jump` (peace), `dataset/neutral` (no_gesture) | **Obsolete** - archived (P2) | Moved to `dataset_archive_endless_runner/`, outside the active dataset |
 | `src/crop_hagrid_hands.py` | **Updated** (P2) | New `GESTURE_FOR` mapping, a `--classes` flag, and a duplicate guard against images already in `dataset/` |
 | `src/check_dataset.py` | **Updated** (P2) | New class set, exact-count and stray-folder checks, up/down orientation QA sheet |
 | `src/prepare_hagrid_dataset.py` | **Retired** (P2) | Built from a geometrically cropped source whose official boxes do not align; now refuses to run |
@@ -410,7 +417,7 @@ Work continues under the objective numbering that replaced `P8`.
 | Objective | Title | Summary |
 |---|---|---|
 | **10** | Final user interface | One 824x704 window: the maze at its native size with a 264 px gesture panel beside it, never over it. A start screen explains the four gestures and waits for SPACE or ENTER while the model loads behind it, so the recognizer keeps a single lifecycle. The panel shows the ROI the CNN sees, the stable command with its confidence, the four mappings with the live one highlighted, and gesture-control health (`READY` / `WAITING` / `OFF` / `CAMERA ERROR`); the raw per-frame class stays in small diagnostic print. Every pause explains itself (`READY!`, `LIFE LOST`, `ROUND N CLEARED!`, a full `GAME OVER` panel). 21 UI checks pass, 60.1 FPS live, and drawing was proved to leave the game's physics, score and lives bit-identical. Manual review approved. **Complete.** |
-| **11** | Test the complete application | Final audit confirmed one canonical path (webcam → recognizer → `stable_command` → controller → `request_direction` → movement). 149/149 automated checks across five suites, including a new 27-check cross-subsystem suite that drives every whole-application flow through the gesture path. Live runs on the real webcam and CUDA model: clean start-screen, ESC and window-close shutdowns (~330–350 ms, one model load, one camera open/release, no threads left), and a 330 s stability run holding game 60 FPS / camera 30 FPS with constant snapshot age and zero backlog. Model, splits, mapping, history, metrics and dataset byte-identical before and after. No application defects found. Final manual acceptance approved. **Complete.** Results in `FINAL_TEST_REPORT.md`. |
+| **11** | Test the complete application | Final audit confirmed one canonical path (webcam → recognizer → `stable_command` → controller → `request_direction` → movement). 149/149 automated checks across five suites, including a new 27-check cross-subsystem suite that drives every whole-application flow through the gesture path. Live runs on the real webcam and CUDA model: clean start-screen, ESC and window-close shutdowns (~330-350 ms, one model load, one camera open/release, no threads left), and a 330 s stability run holding game 60 FPS / camera 30 FPS with constant snapshot age and zero backlog. Model, splits, mapping, history, metrics and dataset byte-identical before and after. No application defects found. Final manual acceptance approved. **Complete.** Results in `FINAL_TEST_REPORT.md`. |
 
 ### Interface principles fixed by Objective 10
 
@@ -426,7 +433,7 @@ missing-glyph boxes, so the gesture legend uses `FIST`, `OPEN PALM`, `THUMBS UP`
 
 ## 20. Project Status
 
-**The project is COMPLETE.** Every phase (P1–P7) and objective (9–11) passed its automated
+**The project is COMPLETE.** Every phase (P1-P7) and objective (9-11) passed its automated
 verification and its manual stop point. Final verified numbers: 99.00% held-out test accuracy,
 threshold 0.90 with 3-of-5 smoothing, game 60 FPS beside a 30 FPS recognizer, 149/149
 automated checks. The known out-of-vocabulary limitation (no reject class) remains documented

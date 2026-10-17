@@ -22,18 +22,14 @@ cv2 = pytest.importorskip("cv2")
 
 from torch import Tensor, nn
 
-from src import gesture_recognizer
+from src import camera, gesture_recognizer
+from src.camera import FRAME_HEIGHT, FRAME_WIDTH, ROI_X1, ROI_Y1, open_camera
 from src.gesture_recognizer import (
     DEFAULT_MIN_AGREEMENT,
     DEFAULT_WINDOW,
     DIRECTIONS,
-    FRAME_HEIGHT,
-    FRAME_WIDTH,
     INDEX_TO_DIRECTION,
-    ROI_X1,
-    ROI_Y1,
     DirectionRecognizer,
-    open_camera,
     select_device,
 )
 
@@ -131,14 +127,14 @@ def test_open_camera_sets_the_frozen_size_or_releases_on_failure(
     monkeypatch: pytest.MonkeyPatch, opened: bool
 ) -> None:
     capture = FakeCapture(opened)
-    monkeypatch.setattr(gesture_recognizer.cv2, "VideoCapture", lambda *_args: capture)
+    monkeypatch.setattr(camera.cv2, "VideoCapture", lambda *_args: capture)
     if not opened:
         with pytest.raises(RuntimeError, match="Could not open webcam device 3"):
             open_camera(3)
         assert capture.released
         return
     assert open_camera() is capture
-    cv2 = gesture_recognizer.cv2
+    cv2 = camera.cv2
     assert capture.settings == {
         cv2.CAP_PROP_FRAME_WIDTH: FRAME_WIDTH,
         cv2.CAP_PROP_FRAME_HEIGHT: FRAME_HEIGHT,
@@ -160,9 +156,20 @@ def test_asking_for_cuda_without_a_gpu_fails_loudly(monkeypatch: pytest.MonkeyPa
 
 def test_the_gpu_is_preferred_but_cpu_can_be_forced(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
     assert select_device().type == "cuda"
     assert select_device("cuda").type == "cuda"
     assert select_device("cpu").type == "cpu"
+
+
+def test_cuda_reported_available_with_no_device_falls_back_to_the_cpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 0)
+    assert select_device().type == "cpu"
+    with pytest.raises(RuntimeError, match="no CUDA GPU is available"):
+        select_device("cuda")
 
 
 def test_an_unknown_device_name_is_refused() -> None:

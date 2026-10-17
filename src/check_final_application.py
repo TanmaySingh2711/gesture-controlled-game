@@ -159,15 +159,8 @@ def main() -> int:
         f"sha256 {FROZEN_CHECKPOINT_SHA256[:16]}... - the loader refuses any other file",
     )
 
-    from src.gesture_recognizer import (
-        DEFAULT_MIN_AGREEMENT,
-        DEFAULT_THRESHOLD,
-        DEFAULT_WINDOW,
-        ROI_X1,
-        ROI_X2,
-        ROI_Y1,
-        ROI_Y2,
-    )
+    from src.camera import ROI_X1, ROI_X2, ROI_Y1, ROI_Y2
+    from src.gesture_recognizer import DEFAULT_MIN_AGREEMENT, DEFAULT_THRESHOLD, DEFAULT_WINDOW
 
     check(
         "frozen recognition settings",

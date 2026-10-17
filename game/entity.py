@@ -39,10 +39,24 @@ class Entity:
         self, maze: Maze, tile: Tile, direction: str | None = None, speed: float = 100.0
     ) -> None:
         self.maze = maze
-        self.direction: str | None = direction
+        self.facing = "left"
+        self.direction = direction
         self.speed = speed
         self.spawn_tile: Tile = tile
         self.x, self.y = maze.tile_center(*tile)
+
+    @property
+    def direction(self) -> str | None:
+        """The way the character is moving, or None while it stands still."""
+        return self._direction
+
+    @direction.setter
+    def direction(self, value: str | None) -> None:
+        self._direction = value
+        # `facing` keeps the last real direction, so a character stopped against a wall still
+        # faces the way it was going instead of snapping back to a default.
+        if value is not None:
+            self.facing = value
 
     # --- geometry ------------------------------------------------------------------------
     @property

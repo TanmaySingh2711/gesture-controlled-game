@@ -30,8 +30,8 @@ pytest -m "not slow"               # a quick loop while editing (skips training 
 `pytest` runs the self-test scripts (`game/main.py --selftest`, `check_integration.py`,
 `check_ui.py`, `check_final_application.py`, `check_data_pipeline.py`, `check_dataset.py` and
 `environment_check.py`) through `tests/test_self_tests.py`, each in a fresh interpreter, since
-several of them assert that torch and cv2 were never imported. Tests needing CUDA, the dataset images or the frozen checkpoint
-skip themselves when those are missing, as they are in CI.
+several of them assert that torch and cv2 were never imported. Tests needing CUDA, the dataset
+images or the frozen checkpoint skip themselves when those are missing, as they are in CI.
 
 On a machine with the GPU and a webcam, also run:
 

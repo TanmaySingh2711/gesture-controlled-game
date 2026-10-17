@@ -188,6 +188,7 @@ gesture-controlled-game/
 │   ├── play_gesture.py       # the full application
 │   ├── gesture_recognizer.py # model, threshold and smoothing
 │   ├── game_integration.py   # recognition thread and gesture controller
+│   ├── camera.py             # webcam opening and the fixed capture area
 │   ├── realtime_gesture.py   # live camera preview and trial recorder
 │   ├── train_model.py        # builds and trains the model
 │   ├── data_pipeline.py      # dataset split, preprocessing and augmentation
@@ -475,13 +476,13 @@ Most of that change time is the hand moving. Once the model first sees the new g
 | Normal | 99.6% |
 | Dim light, colour casts, heavy JPEG, low resolution, tilted hand | 97.9% to 99.4% |
 | Very bright light | 94.0% |
-| Moderate camera noise | 94.2% |
+| Moderate camera noise | 94.3% |
 | Strong blur | 76.7% |
 | Heavy camera noise, as in a dark room | 58.6% |
 
 </details>
 
-**Tests:** 546 automated tests, run on every push in CI. CI fails if code coverage drops below 90%.
+**Tests:** 556 automated tests, run on every push in CI. CI fails if code coverage drops below 90%.
 
 ## Limitations
 

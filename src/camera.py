@@ -1,4 +1,4 @@
-"""Opening the webcam, using OpenCV alone.
+"""The webcam: the frozen capture geometry and opening the device, using OpenCV alone.
 
 Kept apart from `gesture_recognizer`, which imports PyTorch, so the recognition worker can open
 the camera on a helper thread while PyTorch is still loading. Importing PyTorch takes a few
@@ -13,9 +13,14 @@ from typing import Any, Final
 import cv2
 
 # Fixed capture geometry, frozen in docs/PROJECT_SPEC.md section 7 and unchanged since the dataset
-# was built.
+# was built. Every frame is mirrored first; the ROI is then the 300x300 square on the right of
+# the mirrored frame, where a right hand naturally sits, and is all the CNN ever sees.
 FRAME_WIDTH: Final = 640
 FRAME_HEIGHT: Final = 480
+ROI_X1: Final = 300
+ROI_Y1: Final = 90
+ROI_X2: Final = 600
+ROI_Y2: Final = 390
 
 
 def open_camera(index: int = 0) -> Any:

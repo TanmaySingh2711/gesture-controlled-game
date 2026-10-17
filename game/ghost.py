@@ -192,7 +192,7 @@ class Ghost(Entity):
     def chase_target(self, player: Entity, chaser: Ghost | None) -> Tile:
         """The role-specific target. This is the only place the four ghosts really differ."""
         player_tile = player.tile
-        d_row, d_column = DELTA[player.direction or "left"]
+        d_row, d_column = DELTA[player.facing]
 
         if self.role == "chaser":
             return player_tile

@@ -64,6 +64,17 @@ def test_missing_cuda_is_information_not_failure(
     assert "gesture recognition will use the CPU" in capsys.readouterr().out
 
 
+def test_cuda_reported_available_with_no_device_is_treated_as_no_gpu(
+    monkeypatch: pytest.MonkeyPatch, fresh_results: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 0)
+    env.check_torch_and_cuda()
+    assert all(verdicts(fresh_results).values())
+    assert "gesture recognition will use the CPU" in capsys.readouterr().out
+
+
 @pytest.mark.gpu
 def test_a_working_gpu_passes_every_cuda_check(fresh_results: list[Any]) -> None:
     env.check_torch_and_cuda()
