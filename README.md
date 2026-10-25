@@ -61,6 +61,7 @@ python src/play_gesture.py               # play with gestures and keyboard
 ```
 
 On Windows you can skip the terminal: double-click `setup.bat` once, then `run_game.bat`.
+On macOS and Linux: run `bash setup.sh` once, then `bash run_game.sh`.
 
 ## Overview
 
@@ -178,6 +179,7 @@ gesture-controlled-game/
 ├── install.py                # one-command setup
 ├── setup.bat  setup.sh       # one-click wrappers around install.py
 ├── run_game.bat              # double-click to play (Windows)
+├── run_game.sh               # bash run_game.sh to play (macOS, Linux)
 ├── pyproject.toml            # packaging and tool settings
 ├── game/                     # the game itself (Pygame only, no model code)
 │   ├── engine.py             # rules, rounds, drawing
@@ -303,6 +305,10 @@ file.
 
 **Windows:** double-click `run_game.bat`. Its command window and the game window both open in
 the middle of the screen, and pressing **ESC** in the game closes both.
+
+**macOS and Linux:** run `bash run_game.sh` in the project folder. The game window opens in the
+middle of the screen, and **ESC** closes it. Options are passed through, for example
+`bash run_game.sh --no-camera`.
 
 **From a terminal**, after activating the environment
 (`venv\Scripts\activate` on Windows, `source venv/bin/activate` elsewhere):
@@ -482,7 +488,7 @@ Most of that change time is the hand moving. Once the model first sees the new g
 
 </details>
 
-**Tests:** 556 automated tests, run on every push in CI. CI fails if code coverage drops below 90%.
+**Tests:** 557 automated tests, run on every push in CI. CI fails if code coverage drops below 90%.
 
 ## Limitations
 

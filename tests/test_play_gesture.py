@@ -281,6 +281,22 @@ def test_main_runs_a_keyboard_only_benchmark(capsys: pytest.CaptureFixture[str])
     assert "game: 5 frames" in capsys.readouterr().out
 
 
+def test_run_game_sh_starts_the_same_game_as_run_game_bat() -> None:
+    """macOS and Linux get the launcher Windows has: same game, options passed through."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    sh = (root / "run_game.sh").read_bytes()
+    bat = (root / "run_game.bat").read_text(encoding="ascii").replace("\\", "/")
+    assert b"\r" not in sh, "a CR breaks the script on macOS and Linux"
+    assert sh.startswith(b"#!/usr/bin/env bash\n") and b"set -euo pipefail" in sh
+    text = sh.decode("ascii")
+    for step in ("src/play_gesture.py", "PYGAME_HIDE_SUPPORT_PROMPT=1"):
+        assert step in bat and step in text, step
+    # macOS ships bash 3.2, where a bare "$@" with no options fails under set -u.
+    assert '${@+"$@"}' in text
+
+
 @pytest.mark.parametrize("playing", [False, True])
 def test_escape_quits_with_success_so_run_game_closes_its_window(
     monkeypatch: pytest.MonkeyPatch, playing: bool

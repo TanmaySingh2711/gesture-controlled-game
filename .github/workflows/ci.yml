@@ -164,8 +164,8 @@ jobs:
           call run_game.bat --no-camera --benchmark 120 --log-level WARNING || exit /b 1
           venv\Scripts\python.exe game\main.py --selftest
 
-      - name: The game starts from the environment it built (macOS, Linux)
+      - name: The game starts from the environment it built (macOS, Linux, through run_game.sh)
         if: runner.os != 'Windows'
         run: |
-          venv/bin/python src/play_gesture.py --no-camera --benchmark 120 --log-level WARNING
+          bash run_game.sh --no-camera --benchmark 120 --log-level WARNING
           venv/bin/python game/main.py --selftest

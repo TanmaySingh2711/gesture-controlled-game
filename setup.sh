@@ -25,4 +25,4 @@ fi
 
 echo
 echo "Setup finished. To play:"
-echo "    venv/bin/python src/play_gesture.py"
+echo "    bash run_game.sh"

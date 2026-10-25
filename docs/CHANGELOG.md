@@ -5,6 +5,11 @@ each verified before the next began; the entries below follow those phases.
 
 ## [Unreleased] - reach, honesty and evidence round
 
+### Added
+- **`run_game.sh`** starts the game on macOS and Linux (`bash run_game.sh`), as `run_game.bat`
+  does on Windows: options are passed through, and an error is reported in plain words. CI's
+  macOS and Linux setup jobs now start the game through it.
+
 ### Changed
 - **Faster start-up.** The game window now opens in about 0.6 s after a double-click instead of
   about 1.1 s: only the pygame systems the game uses are started (no joystick system), the
