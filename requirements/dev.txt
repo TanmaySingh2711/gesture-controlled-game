@@ -16,4 +16,4 @@ psutil==7.2.2
 pre-commit==4.6.2
 # torch depends on setuptools, and the PyTorch wheel index only carries an old, vulnerable
 # release (78.1.0). Pinning it here upgrades it from PyPI so pip-audit passes in CI.
-setuptools==84.0.0
+setuptools==84.1.0

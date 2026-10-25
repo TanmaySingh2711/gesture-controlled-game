@@ -28,7 +28,7 @@ pygame==2.6.1
 numpy==2.5.3
 matplotlib==3.11.2
 scikit-learn==1.9.1
-pillow==12.3.0
+pillow==13.0.0
 
 # Key transitive versions confirmed working in this environment
 # (installed automatically by the packages above, listed here for reference only):
